@@ -1,0 +1,16 @@
+At t = 0.28:
+
+=========
+Error using cat
+Requested 3618x7x84028 (15.9GB) array exceeds maximum array size preference. Creation of arrays greater than this
+limit may take a long time and cause MATLAB to become unresponsive. See array size limit or preference panel for more
+information.
+
+Error in ode45 (line 434)
+      f3d  = cat(3,f3d,zeros(neq,7,chunk,dataType));
+
+Error in runEulerCodeShuttleDual (line 122)
+    sol = ode45(@odefun, tspan, y0,options);
+
+Error in test_launch_script_v1 (line 39)
+    q2, bubble2, shuttle2] = runEulerCodeShuttleDual(nx, ...

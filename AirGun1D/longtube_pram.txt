@@ -1,0 +1,13 @@
+% % New set for data matching -- ballpark numbers
+r = 75;         % Distance from source to receiver [m]
+c_inf = 1482;   % Speed of sound in water [m/s]
+rho_inf = 1000; % Density of water [kg/m^3]
+airgunPressure = 1000;     % [psi]
+airgunLength = 6;          % [m]
+airgunPortArea = 120 ;     % [in^2]
+airgunCrossSecArea = 87.2; % [in^2]
+airgunDepth = 7.5;         % [m]
+airgunFiringChamberProfile = @(a) error('Placeholder; not implemented');
+airgunOperatingChamberProfile = @(a) error('Placeholder; not implemented');
+bubbleInitialVolume = 600; % [cui]
+shuttleBdryPenaltyStrength = 1e11; % [N/m]
