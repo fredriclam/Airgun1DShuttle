@@ -1,3 +1,6 @@
+%% TODO: document
+%% TODO: visualize operating chamber geometry
+
 classdef OperatingChamber
     properties
         totalVolume
