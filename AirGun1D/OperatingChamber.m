@@ -20,6 +20,10 @@ classdef OperatingChamber
             obj.total_travel_length = 3.009 *0.0254;
             obj.totalVolume = obj.rearVolume(obj.total_travel_length);
         end
+        
+        function obj = visualize(obj)
+            
+        end
          
         function V = frontVolume(obj, x)
             V = obj.totalVolume - obj.rearVolume(x);

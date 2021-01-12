@@ -1,4 +1,4 @@
-function [dz, p_rear, p_front, p_Mid] = shuttleEvolve(z, p_L, physConst, opChamber)
+function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve(z, p_L, physConst, opChamber)
 % Computes evolution of the state vector
 %   z = [pos; vel; m_L; E_L; m_R; E_R]
 % for the shuttle assembly and the operating chamber partitions (denoted
@@ -8,11 +8,14 @@ function [dz, p_rear, p_front, p_Mid] = shuttleEvolve(z, p_L, physConst, opChamb
 %   Input:
 %     z = [pos; vel; m_L; E_L; m_R; E_R]
 %     p_L = pressure on left side of shuttle assembly (from firing chamber)
-%     physConst = struct of physical constnats
+%     physConst = struct of physical constants
 %     opChamber = object of type OperatingChamber
 %   Output: dz = [dpos; dvel; ...; dE_R] (time derivatives of state z)
-% 
-% Last update: 2020-09-23 (minor fix and cleanup).
+%     p_rear = pressure at rear of shuttle, in operating chamber
+%     p_front = pressure at front of shuttle, in operating chamber
+%     p_Mid = pressure in middle chamber (if vented to ambient, constant)
+%     subsystemState = human-readable struct with all relevant states and
+%       differentials
 
 %% Compute thermodynamic state and define helper variables
 % Unpack state
@@ -77,9 +80,7 @@ else
     TMax = T_front;
 end
 
-efficiencyFactor = 1.0;
-
-flowL2R = efficiencyFactor * ...
+flowL2R = ...
     flowSignL2R * opChamber.gapArea(z(1)) * M * ...
     sqrt(g * pMax * rhoMax) * ...
     (1 + (g-1)/2 * M^2)^(0.5*(-g-1)/(g-1));
@@ -100,13 +101,38 @@ dz = [z(2);
       flowL2R;
       c_p * flowL2R * TMax + p_front * A_R * z(2);];
 
-% assert(all(isreal(dz)) && all(~isnan(dz)));
-
+% Create human-readable object with shuttle and chamber data
+subsystemState = struct('opChamberRear_m', m_rear, ...
+                        'opChamberRear_E', E_rear, ...
+                        'opChamberRear_rho', rho_rear, ...
+                        'opChamberRear_T', T_rear, ...
+                        'opChamberRear_p', p_rear, ...
+                        'opChamberFront_m', m_front, ...
+                        'opChamberFront_E', E_front, ...
+                        'opChamberFront_rho', rho_front, ...
+                        'opChamberFront_T', T_front, ...
+                        'opChamberFront_p', p_front, ...
+                        'penaltyForce', penaltyForce, ...
+                        'opChamberFront_area', A_L, ...
+                        'opChamberRear_area', A_R, ...
+                        'midChamber_length', midChamberLength, ...
+                        'midChamber_area', A_Mid, ...
+                        'midChamber_p', p_Mid, ...
+                        'opChamberFlow_M', M, ...
+                        'opChamberFlow_massL2R', flowL2R, ...
+                        'opChamberFlow_denergydtL', dz(4), ...
+                        'opChamberFlow_denergydtL', dz(6), ...
+                        'shuttle_position', z(1), ...
+                        'shuttle_velocity', z(2), ...
+                        'shuttle_acceleration', dz(2), ...
+                        'shuttle_force', netForce, ...
+                        'physConst', physConst);
 return
 
 %% Legacy damping forces
 % The following functions can be used to provide additional sources of
-% damping.
+% damping. These sources are typically insignificant compared to the
+% chamber gas dynamics.
 
 % Arbitrary damping model
 % Input: state vector z --- [pos; vel]
@@ -114,14 +140,14 @@ function dampingForce = linearDampingForce(z)
 dampingForce = -5e2 * z(2);
 
 % Constant damping force
-% Coefficient of friction (would be empirical). Doesn't really do much!
+% Coefficient of friction (would be empirical).
 % Input: state vector z --- [pos; vel]
 function dampingForce = coulombDampingForce(z, physConst)
 magnitude = 0.3 * 9.8 * physConst.shuttleAssemblyMass;
 dampingForce = -sign(z(2)) * magnitude;
 
 function dampingForce = constantDampingForce(z)
-dampingForce = -10e3; % 2 kN (overpredicting the INcompressible turbulent 1/7-law)
+dampingForce = -10e3; % 2 kN (overpredicting the incompressible turbulent 1/7-law)
 
 % Viscoelastic model: is this just linear damping?
 % Input: state vector z --- [pos; vel]
