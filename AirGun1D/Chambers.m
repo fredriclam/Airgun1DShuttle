@@ -1,6 +1,5 @@
 %% Chambers object
 % Contains data for the middle and operating chamber. 
-%% TODO: visualize operating chamber geometry
 
 classdef Chambers
     properties

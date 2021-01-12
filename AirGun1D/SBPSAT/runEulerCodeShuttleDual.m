@@ -77,7 +77,7 @@ function [sol, q1, bubble1, shuttle1, plug1, ...
         plug2 = y(ind1:ind2);
         
         % Update new model
-        [dq, dBubble, dShuttle, dPlug, p_RTarget, u_RTarget, monitor] = ...
+        [dq, dBubble, dShuttle, dPlug, p_RTarget, u_RTarget, monitor, shuttleMonitor] = ...
             RHSShuttle(q2,t,bubble2,shuttle2,plug2,p_RTarget,u_RTarget);
         dyShuttle = [dq; dBubble; dShuttle; dPlug];
         
@@ -85,19 +85,21 @@ function [sol, q1, bubble1, shuttle1, plug1, ...
         dy = [dyRevert; dyShuttle];
         
         % DEBUG: state monitoring
+        monitorData = struct('monitor', monitor, ...
+                'shuttleMonitor', shuttleMonitor);
         if ~exist('monitorStates', 'var')
             monitorStates = struct('length', 1000, ...
                 'index', 2);
-            monitorStates.data = monitor;
+            monitorStates.data = monitorData;
             % Duplicate with filler data
-            monitorStates.data(1:monitorStates.length) = monitor;
+            monitorStates.data(1:monitorStates.length) = monitorData;
         else
             if monitorStates.index > monitorStates.length
                 monitorStates.data(monitorStates.length+1: ...
-                                   monitorStates.length+1000) = monitor;
+                                   monitorStates.length+1000) = monitorData;
                 monitorStates.length = monitorStates.length + 1000;
             end
-            monitorStates.data(monitorStates.index) = monitor;
+            monitorStates.data(monitorStates.index) = monitorData;
             monitorStates.index = monitorStates.index + 1;
         end
 
