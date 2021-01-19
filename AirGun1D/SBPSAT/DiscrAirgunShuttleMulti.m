@@ -138,12 +138,24 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 u_R = q_R(2)/q_R(1);
                 rho_R = q_R(1);
                 e_tot_R = q_R(3);
-                T_R = schm.T(q_R);
+                T_R = (e_tot_R - 0.5 * rho_R * u_R^2) / rho_R / physConst.c_v;
                 c_R = sqrt(physConst.gamma * Q_ * T_R);
                 M_R = u_R / c_R;
                 
+                % Compute stagnation pressure
+                p0_R = p_R * ...
+                    (1 + (gamma_ - 1)/2 * ...
+                    M_R^2)^(gamma_/(gamma_-1));
+                               
+                % Capture flow state in PDE domain
+                flowState = schm.flowStateR(q);
+                
+                % Create empty note string
+                noteString = "";
+                
                 % Compute geometry
                 if REVERT_MODEL
+                    caseKey = 'noShuttle';
                     % Fix outlet area to equal the cross-sectional area
                     APortExposed = physConst.A;
                     if t <= physConst.AirgunCutoffTime
@@ -161,34 +173,64 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     % the shuttle: the % of the travel is thus the % of the
                     % full port area that is exposed
                     APortExposed = max([0, physConst.APortTotal * ...
-                        (posShuttle - physConst.portLead) / ...
+                        (shuttle(1) - physConst.portLead) / ...
                         (physConst.operatingChamberLength - physConst.portLead)]);
                     
-                    % Case 0: port is closed
-                    if APortExposed == 0 %|| M_R <= 0
-                        caseKey = 'closedPort'; % Port is closed
+                    % Case dependent boundary values
+                    if APortExposed == 0 % Case 0: port is closed
+                        caseKey = 'portClosed'; % Port is closed
                         massFlowPort = 0;
                         velocityPort = 0;
-                        rhoPort = pPort / Q_ / TPort;
                         pPort = p_R;
                         TPort = T_R;
-                    elseif 
+                        rhoPort = pPort / Q_ / TPort;
+                    elseif p0_R < bubblePressure(bubble, physConst)
+                        caseKey = 'subsonic';
+                        [MTarget, rhoPort, TPort] = ...
+                            resolveSubsonicVelocity(obj, ...
+                               APortExposed, p_R, T_R, pBubble);
+                        massFlowPort = rho_R * u_R * ...
+                            physConst.crossSectionalArea;
+                        % Enforce pressure continuity through port
+                        pPort = bubblePressure(bubble, physConst);
+                    elseif APortExposed > physConst.crossSectionalArea
+                        caseKey = 'chamberChoked';
+                        [velocityPort, pPort, TPort, ...
+                            rhoPort, cPort, massFlowPort] ...
+                            = resolveSonicChamber(obj, APortExposed, ...
+                            u_R/c_R, p_R, T_R);                        
+                    else
+                        caseKey = 'portChoked';
+                        [u_RTarget, pPort, TPort, rhoPort, cPort, massFlowPort]...
+                        = resolveSonicPort(obj, APortExposed, u_R/c_R, p_R, T_R);
+                        velocityPort = massFlowPort / (rhoPort * APortExposed);
+                    end
+                    
+                    if  flowState == scheme.Euler1d.SUPERSONIC_OUTFLOW ...
+                            && ~strcmpi ('chamberChoked', caseKey)
+                        noteString = noteString + ...
+                            "Chamber should not be choked but it is";
                     end
                        
-%                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
-%                     pBubble % Original issue
-                    
+                % Compute port total energy per unit volume
+                eTotalPort = rhoPort * physConst.c_v * TPort ...
+                    + 0.5 * rhoPort * velocityPort^2;
                 end
+                % Compute port sound speed
+                cPort = sqrt(physConst.gamma * physConst.Q * TPort);
                 
-                
-                
-                % Compute stagnation pressure
-                p0_R = p_R * ...
-                    (1 + (gamma_ - 1)/2 * ...
-                    M_R^2)^(gamma_/(gamma_-1));
-                               
-                % Capture flow state in PDE domain
-                flowState = schm.flowStateR(q);
+                % Compute primitives everywhere in Euler domain
+                pEulerDomain = NaN(size(q(1:3:end)));
+                for i = 1:length(pEulerDomain)
+                    pEulerDomain(i) = schm.p(q(1+3*(i-1):3+3*(i-1)));
+                end
+                rhoEulerDomain = q(1:3:end);
+                uEulerDomain = q(2:3:end) ./ q(1:3:end);
+                eEulerDomain = q(3:3:end);
+                TEulerDomain = (eEulerDomain ./ rhoEulerDomain ...
+                       - 0.5 * uEulerDomain.^2) / physConst.c_v;
+                cEulerDomain = sqrt(physConst.gamma * physConst.Q * TEulerDomain);
+                MEulerDomain = uEulerDomain ./ cEulerDomain;
                 
                 %% Construct data hierarchy
                 portStates = struct( ...
@@ -198,9 +240,20 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     'rhoPort', rhoPort, ...
                     'pPort', pPort, ...
                     'TPort', TPort, ...
-                    'caseKey', caseKey ...
+                    'cPort', cPort, ...
+                    'MPort', velocityPort/cPort, ...
+                    'eTotalPort', eTotalPort, ...
+                    'caseKey', caseKey, ...
+                    'ARatio', APortExposed / physConst.crossSectionalArea ...
                 );
                 eulerDomainStates = struct(...
+                    'rho', rhoEulerDomain, ...
+                    'u', uEulerDomain, ...
+                    'e', eEulerDomain, ...
+                    'p', pEulerDomain, ...
+                    'T', TEulerDomain, ...
+                    'c', cEulerDomain, ...
+                    'M', MEulerDomain, ...
                     'q_R', q_R, ...
                     'p_R', p_R, ...
                     'u_R', u_R, ...
@@ -210,7 +263,9 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     'c_R', c_R, ...
                     'M_R', M_R, ...
                     'p0_R', p0_R, ... % Stagnation pressure
-                    'flowState', flowState ...
+                    'flowState', flowState, ...
+                    'matrix_T_at_x_R', schm.T(q_R), ...
+                    'characteristics_at_x_R', schm.T(q_R) \ q_R ...
                 );
                 bubbleStates = struct(...
                     'R', bubble(1), ...
@@ -218,9 +273,10 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     'm', bubble(3), ...
                     'E', bubble(4) , ...
                     'p',  bubblePressure(bubble, physConst), ...
-                    'T', bubble(4) / physConst.c_v / bubble(3), ...
-                    'rho', pBubble / Q_ / TBubble ...
+                    'T', bubble(4) / physConst.c_v / bubble(3) ...
                 );
+                bubbleStates.rho = bubbleStates.p / ...
+                    (physConst.Q * bubbleStates.T); 
                 shuttleStates = struct(...
                     'pos', shuttle(1), ...
                     'vel', shuttle(2) ...
@@ -231,8 +287,11 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     'portStates', portStates, ...
                     'eulerDomainStates', eulerDomainStates, ...
                     'bubbleStates', bubbleStates, ...
-                    'shuttleStates', shuttleStates ...
+                    'shuttleStates', shuttleStates, ...
+                    'noteString', noteString ...
                 );
+                figure(101);
+                plot(schm.u,agState.eulerDomainStates.T); drawnow;
             end
             
             %% Redefine RHS to include evolution of shuttle and port-region
@@ -250,6 +309,13 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 assert(agState.eulerDomainStates.p_R > 0);
                 assert(isreal(agState.eulerDomainStates.M_R));
                 assert(~isnan(agState.eulerDomainStates.M_R));
+                assert(agState.eulerDomainStates.T_R > 0 && ...
+                       agState.eulerDomainStates.p_R > 0  && ...
+                       agState.eulerDomainStates.c_R > 0);
+                assert(agState.portStates.rhoPort > 0);
+                assert(agState.portStates.APortExposed > 0 || ...
+                       agState.portStates.velocityPort == 0);
+                    
                 % Check for temporary inflow
                 if agState.eulerDomainStates.flowState ...
                    == scheme.Euler1d.SUBSONIC_INFLOW ...
@@ -260,134 +326,134 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                             num2str(agState.eulerDomainStates.u_R)]);
                 end
                 
-                if ~REVERT_MODEL
-                    %% Case split
-                    % Case 0: the port is closed.
-                    % Conditions:
-                    %   - the port area is zero.
-                    % Effects:
-                    %   - wall boundary condition applied at the fc exit
-                    
-                    % Case 1: subsonic everywhere
-                    % Conditions:
-                    %   - the internal pressure is insufficient to expand
-                    %     to the characteristic outflow pressure
-                    % Should be an edge case indicating insufficient
-                    % internal pressure.
-                    % Effects:
-                    %   - bubble pressure determines flow state upstream
-                    
-                    % Case 2: sonic at port
-                    % Conditions:
-                    %   - Previous case conditions are not met
-                    % Should be the most commonly encountered case.
-                    
-                    % Case 3: sonic at the firing chamber exit
-                    % Conditions:
-                    %   - the resulting flow to the port must be possible
-                    %     (i.e., must be converging in absence of friction)
-                    % Effects:
-                    %   - the port flow is determined
-                    
-                    % [Obsolete] Case 4: firing chamber shock formation
-                    % Conditions:
-                    %   - the flow was internally sonic, but the resulting
-                    %     steady flow to the port was not possible
-                    % e.g. if the flow is choked inside and the port is
-                    % closed too rapidly
-                    % Effects:
-                    %   - the port becomes sonic
-                    %   - shock formation must come through Euler domain BC
-                    % Essentially the same as case 4.
-                    
-                    % Compute critical back pressure at characteristic
-                    % bubble velocity
+%                 if ~REVERT_MODEL
+%                     %% Case split
+%                     % Case 0: the port is closed.
+%                     % Conditions:
+%                     %   - the port area is zero.
+%                     % Effects:
+%                     %   - wall boundary condition applied at the fc exit
+%                     
+%                     % Case 1: subsonic everywhere
+%                     % Conditions:
+%                     %   - the internal pressure is insufficient to expand
+%                     %     to the characteristic outflow pressure
+%                     % Should be an edge case indicating insufficient
+%                     % internal pressure.
+%                     % Effects:
+%                     %   - bubble pressure determines flow state upstream
+%                     
+%                     % Case 2: sonic at port
+%                     % Conditions:
+%                     %   - Previous case conditions are not met
+%                     % Should be the most commonly encountered case.
+%                     
+%                     % Case 3: sonic at the firing chamber exit
+%                     % Conditions:
+%                     %   - the resulting flow to the port must be possible
+%                     %     (i.e., must be converging in absence of friction)
+%                     % Effects:
+%                     %   - the port flow is determined
+%                     
+%                     % [Obsolete] Case 4: firing chamber shock formation
+%                     % Conditions:
+%                     %   - the flow was internally sonic, but the resulting
+%                     %     steady flow to the port was not possible
+%                     % e.g. if the flow is choked inside and the port is
+%                     % closed too rapidly
+%                     % Effects:
+%                     %   - the port becomes sonic
+%                     %   - shock formation must come through Euler domain BC
+%                     % Essentially the same as case 4.
+%                     
+%                     % Compute critical back pressure at characteristic
+%                     % bubble velocity
+% 
+%                     % Case 0: port is closed
+%                     if APortExposed == 0 %|| M_R <= 0
+% %                         caseNum = 0; % Port is closed
+% %                         vel_a = 0;
+% %                         massFlowPort = 0;
+% %                         % Smooth continuation
+% %                         TPort = T_R / temperatureMachFunction(gamma_, 1);
+% %                         pPort = p_R / pressureMachFunction(gamma_, 1);
+% %                         rhoPort = pPort / Q_ / TPort;
+% % %                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
+% % %                     pBubble % Original issue
+%                     elseif p0_R < pBubble
+% %                         caseNum = 1; % Subsonic
+% %                         if DEBUG
+% %                             assert(u_R >= 0);
+% %                         end          
+%                         % Mass flow rate is computed using pressure as
+%                         % influenced by downstream
+% %                         [pTarget, TPort, rhoPort, cPort, ...
+% %                             massFlowPort] ...
+% %                         [pTarget, rhoPort, TPort] ...
+% %                             = resolveSubsonicPressure(obj, ...
+% %                                APortExposed, M_R, T_R, pBubble);
+%                            
+% %                       [MTarget, rhoPort, TPort] = resolveSubsonicVelocity(obj, ...
+% %                                APortExposed, p_R, T_R, pBubble);
+% % 
+% %                         massFlowPort = rho_R * u_R * ...
+% %                             physConst.crossSectionalArea;
+%                            
+%                         % Enforce pressure continuity through port
+% %                         pPort = pBubble;
+% %                         u_RTarget = vel_a;
+%                         
+%                     elseif APortExposed > physConst.crossSectionalArea
+%                         % Resolve chamber-choked flow
+% %                         caseNum = 3;
+% %                         [velocityPort, pPort, TPort, ...
+% %                             rhoPort, cPort, massFlowPort] ...
+% %                             = resolveSonicChamber(obj, APortExposed, u_R/c_R, p_R, T_R);
+% %                         isSonicFlags(1) = true;
+%                     else
+%                         % Port-choked flow
+% %                         caseNum = 2;
+% %                         if ~isempty(p_RTarget)
+% %                             p_R_Used = p_RTarget;
+% %                         else
+% %                             p_R_Used = p_R;
+% %                         end
+% %                         [velUp, pPort, TPort, rhoPort, cPort, massFlowPort]...
+% %                         = resolveSonicPort(obj, APortExposed, u_R/c_R, p_R_Used, T_R);
+% %                         % Add constraint velocity of plug flow
+% %                         if BYPASS_PLUG
+% %                             vel_a = velUp;
+% %                         else
+% %                             vel_a = velUp + shuttle(2);
+% %                         end
+% %                         u_RTarget = vel_a;
+% %                         isSonicFlags(2) = true;
+%                     end 
+%                     
+%                     % Compute throat pressure
+%                     if ~isempty(p_RTarget)
+%                         pThroat = p_RTarget;
+%                     else
+%                         pThroat = p_R;
+%                     end
+%                     
+%                     pCrit = 1; % Unused
+%                     
+%                     if ~REVERT_MODEL
+%                         assert(T_R > 0 && ...
+%                                p_R > 0  && ...
+%                                c_R > 0);
+%                     end
+%                 end
 
-                    % Case 0: port is closed
-                    if APortExposed == 0 %|| M_R <= 0
-%                         caseNum = 0; % Port is closed
-%                         vel_a = 0;
-%                         massFlowPort = 0;
-%                         % Smooth continuation
-%                         TPort = T_R / temperatureMachFunction(gamma_, 1);
-%                         pPort = p_R / pressureMachFunction(gamma_, 1);
-%                         rhoPort = pPort / Q_ / TPort;
-% %                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
-% %                     pBubble % Original issue
-                    elseif p0_R < pBubble
-                        caseNum = 1; % Subsonic
-                        if DEBUG
-                            assert(u_R >= 0);
-                        end          
-                        % Mass flow rate is computed using pressure as
-                        % influenced by downstream
-%                         [pTarget, TPort, rhoPort, cPort, ...
-%                             massFlowPort] ...
-%                         [pTarget, rhoPort, TPort] ...
-%                             = resolveSubsonicPressure(obj, ...
-%                                APortExposed, M_R, T_R, pBubble);
-                           
-                      [MTarget, rhoPort, TPort] = resolveSubsonicVelocity(obj, ...
-                               APortExposed, p_R, T_R, pBubble);
-
-                        massFlowPort = rho_R * u_R * ...
-                            physConst.crossSectionalArea;
-                           
-                        % Enforce pressure continuity through port
-                        pPort = pBubble;
-%                         u_RTarget = vel_a;
-                        
-                    elseif APortExposed > physConst.crossSectionalArea
-                        % Resolve chamber-choked flow
-                        caseNum = 3;
-                        [velocityPort, pPort, TPort, ...
-                            rhoPort, cPort, massFlowPort] ...
-                            = resolveSonicChamber(obj, APortExposed, u_R/c_R, p_R, T_R);
-                        isSonicFlags(1) = true;
-                    else
-                        % Port-choked flow
-                        caseNum = 2;
-                        if ~isempty(p_RTarget)
-                            p_R_Used = p_RTarget;
-                        else
-                            p_R_Used = p_R;
-                        end
-                        [velUp, pPort, TPort, rhoPort, cPort, massFlowPort]...
-                        = resolveSonicPort(obj, APortExposed, u_R/c_R, p_R_Used, T_R);
-                        % Add constraint velocity of plug flow
-                        if BYPASS_PLUG
-                            vel_a = velUp;
-                        else
-                            vel_a = velUp + shuttle(2);
-                        end
-                        u_RTarget = vel_a;
-                        isSonicFlags(2) = true;
-                    end 
-                    
-                    % Compute throat pressure
-                    if ~isempty(p_RTarget)
-                        pThroat = p_RTarget;
-                    else
-                        pThroat = p_R;
-                    end
-                    
-                    pCrit = 1; % Unused
-                    
-                    if ~REVERT_MODEL
-                        assert(T_R > 0 && ...
-                               p_R > 0  && ...
-                               c_R > 0);
-                    end
-                end
-
-                %% State regularization
-                if M_R < 0 && ~REVERT_MODEL
-                    if abs(M_R) > 1e-6
-                        warning('Negative mach number');
-                    end
-                    M_R = 0;
-                    u_R = 0;
-                end
+%                 %% State regularization
+%                 if M_R < 0 && ~REVERT_MODEL
+%                     if abs(M_R) > 1e-6
+%                         warning('Negative mach number');
+%                     end
+%                     M_R = 0;
+%                     u_R = 0;
+%                 end
 
                 %% Shuttle (and operating chamber) dynamics
                 % Compute shuttle state evolution
@@ -396,132 +462,123 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     % Send boundary pressure to shuttle assembly
                     [dShuttle, pShutRear, pShutFront, pMid, shuttleMonitor] = ...
                         shuttleEvolve(...
-                        shuttle, p_R, ...
+                        shuttle, agState.eulerDomainStates.p_R, ...
                         physConst, obj.chambers);
                 else
                     dShuttle = 0*shuttle;
                 end
 
                 %% State monitoring
-                if ~REVERT_MODEL
-                    assert(all(isreal([M_R, u_R, c_R, ...
-                        massFlowPort])));
-
-                    if caseNum == 0
-                        exportedpTarget = NaN;
-                        exporteduTarget = 0;
-                    elseif caseNum == 1
-                        exportedpTarget = NaN;
-                        exporteduTarget = MTarget * c_R;
-%                         exportedpTarget = pTarget;
+%                 if ~REVERT_MODEL
+%                     assert(all(isreal([M_R, u_R, c_R, ...
+%                         massFlowPort])));
+% 
+%                     if caseNum == 0
+%                         exportedpTarget = NaN;
+%                         exporteduTarget = 0;
+%                     elseif caseNum == 1
+%                         exportedpTarget = NaN;
+%                         exporteduTarget = MTarget * c_R;
+% %                         exportedpTarget = pTarget;
+% %                         exporteduTarget = NaN;
+%                     elseif caseNum == 2
+%                         exportedpTarget = NaN;
+%                         exporteduTarget = u_RTarget;
+%                     elseif caseNum == 3
+%                         exportedpTarget = NaN;
 %                         exporteduTarget = NaN;
-                    elseif caseNum == 2
-                        exportedpTarget = NaN;
-                        exporteduTarget = u_RTarget;
-                    elseif caseNum == 3
-                        exportedpTarget = NaN;
-                        exporteduTarget = NaN;
-                    else
-                        error('Unknown case.');
-                    end
-
-                    monitor = struct('t', t, ...
-                        'caseNum', caseNum, ...
-                        'pRatio', pThroat/pCrit, ...
-                        'ARatio', APortExposed / ...
-                                  physConst.crossSectionalArea, ...
-                        'p_R', p_R, ...
-                        'bubbleR', bubble(1), ...
-                        'bubbleRDot', bubble(2), ...
-                        'bubbleMass', bubble(3), ...
-                        'bubbleEnergy', bubble(4), ...
-                        'exportedpTarget', exportedpTarget, ...
-                        'exporteduTarget', exporteduTarget, ...
-                        'firingChamberExit_vector_q', q_R, ...
-                        'firingChamberExit_matrix_T', schm.T(q_R), ...
-                        'firingChamberExit_characteristics', schm.T(q_R) \ q_R, ...
-                        'firingChamberExit_rho', rho_R, ...
-                        'firingChamberExit_p', p_R, ...
-                        'firingChamberExit_T', T_R, ...
-                        'firingChamberExit_u', u_R, ...
-                        'firingChamberExit_M', M_R ...
-                        );
-                else
-                    % Do nothing
-                end
+%                     else
+%                         error('Unknown case.');
+%                     end
+% 
+%                     monitor = struct('t', t, ...
+%                         'caseNum', caseNum, ...
+%                         'pRatio', pThroat/pCrit, ...
+%                         'ARatio', APortExposed / ...
+%                                   physConst.crossSectionalArea, ...
+%                         'p_R', p_R, ...
+%                         'bubbleR', bubble(1), ...
+%                         'bubbleRDot', bubble(2), ...
+%                         'bubbleMass', bubble(3), ...
+%                         'bubbleEnergy', bubble(4), ...
+%                         'exportedpTarget', exportedpTarget, ...
+%                         'exporteduTarget', exporteduTarget, ...
+%                         'firingChamberExit_vector_q', q_R, ...
+%                         'firingChamberExit_matrix_T', schm.T(q_R), ...
+%                         'firingChamberExit_characteristics', schm.T(q_R) \ q_R, ...
+%                         'firingChamberExit_rho', rho_R, ...
+%                         'firingChamberExit_p', p_R, ...
+%                         'firingChamberExit_T', T_R, ...
+%                         'firingChamberExit_u', u_R, ...
+%                         'firingChamberExit_M', M_R ...
+%                         );
+%                 else
+%                     % Do nothing
+%                 end
 
                 %% Airgun PDE evolution
                 % Compute airgun state evolution with left BC
                 dq = schm.D(q) + closure_l(q);
                 if REVERT_MODEL
-                    if velocityPort == 0 && t > 0.0
+                    if agStates.portStates.velocityPort == 0 && t > 0.0
                         dq = dq + closure_r_closed(q);
 %                         assert(t >= 0.010)
                     elseif ~isSonicFlags(1) % Subsonic (in chamber)
-                        dq = dq + closure_r_out_sub(q, pBubble);
+                        dq = dq + closure_r_out_sub(q, agStates.bubbleStates.p);
                     end
                 else
-                    if caseNum == 0
-                        % Closed end when A_port = 0
+%                     % Working code
+%                     if strcmpi('portClosed', ...
+%                             agState.portStates.caseKey)
+%                         % Closed end when A_port = 0
+%                         dq = dq + closure_r_closed(q);
+%                     elseif strcmpi('subsonic', ...
+%                             agState.portStates.caseKey)
+%                         % Pressure boundary condition up
+% %                         dq = dq + closure_r_out_sub(q, pTarget);
+%                         disp("Subsonic u condition:" + MTarget*c_R);
+%                         dq = dq + closure_r_out_sub_vel(q, MTarget*c_R);
+%                     elseif strcmpi('portChoked', ...
+%                             agState.portStates.caseKey)
+%                         if agState.portStates.velocityPort <= 0 % TODO: This needs to checked CHECK: check this
+%                             dq = dq + closure_r_closed(q);
+%                         else
+%                             if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
+%                                 % Set velocity boundary condition TODO:
+%                                 % consider momentum boundary condition
+%                                 dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+%                             end
+%                         end
+%                     end
+                    
+                    % Testing: shock the BC
+                    if t < 0.001
                         dq = dq + closure_r_closed(q);
-                    elseif caseNum == 1
-                        % Pressure boundary condition up
-%                         dq = dq + closure_r_out_sub(q, pTarget);
-                        disp("Subsonic u condition:" + MTarget*c_R);
-                        dq = dq + closure_r_out_sub_vel(q, MTarget*c_R);
-                    elseif ~isSonicFlags(1) % Subsonic in chamber
-                        if vel_a == 0
-                            dq = dq + closure_r_closed(q);
-                        elseif isSonicFlags(2) % Sonic at port: momentum BC
-                            if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
-                                dq = dq + closure_r_out_sub_vel(q, vel_a); % TODO: CHECK IF IT'S REAL
-                            end
-%                             disp(vel_a)
-                        else % Subsonic at port: pressure matching
-%                             warning('Unchecked subsonic port BC.')
-                            dq = dq + closure_r_out_sub_vel(q, vel_a);
-%                             dq = dq + closure_r_out_sub(q, pUpstream);
-                        end
                     else
-                        % Check the sonic claim
-%                         assert(schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW)
-                        %                         warning('Sonic-in-chamber case not treated.')
-                        warning('Discr -> RHS logged a sonic case. No BC applied.')
+                        dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
                     end
                 end
                 
                 if ~all(isreal(dq))
-                    warning('Complex dq, taking real part')
+                    error('Complex dq, taking real part')
                     dq = real(dq);
                 end
-%                 assert(all(isreal(dq)))
                 
                 %% Bubble evolution
-                % Compute port velocity
-                if APortExposed > 0 && rhoPort > 0
-                    velocityPort = massFlowPort / rhoPort / APortExposed;
-                else
-                    velocityPort = 0;
-                end
-                % Compute port specific stagnation energy
-                if REVERT_MODEL
-                    ePort = e_R;
-                else
-                    % Compute total energy per volume
-                    ePort = rhoPort * physConst.c_v * TPort + ...
-                        0.5 * rhoPort * velocityPort^2;
-                end
                 % Compute bubble differential
+                
                 dBubble = bubbleRHS(bubble, ...
-                    rhoPort, ...
-                    velocityPort, ...
-                    ePort, ...
-                    pPort, ...
-                    APortExposed, ...physConst.A, ...APortExposed, ...
-                    physConst);
+                    agState.portStates.rhoPort, ...
+                    agState.portStates.velocityPort, ...
+                    agState.portStates.eTotalPort, ...
+                    agState.portStates.pPort, ...
+                    agState.portStates.APortExposed, ...
+                    physConst ...
+                );
                 % Freeze bubble when port is closed
                 if ~REVERT_MODEL
-                    if APortExposed == 0 || abs(M_R) < 1e-6
+                    if agState.portStates.APortExposed == 0 ...
+                            || abs(agState.eulerDomainStates.M_R) < 1e-6 % TODO: remove M_R condition
                         if obj.bubbleFrozen
                             dBubble = zeros(size(dBubble));
                         end
@@ -530,20 +587,20 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     end
                     
                     assert(dBubble(3) >= 0)
-%                     assert(bubble(3) >= 0)
-                end
-                
-                %% Plug evolution
-                if REVERT_MODEL
-                    dPlug = [0;0];
-                else
-                    dPlug = [nan; nan];
-                    dPlug(1) = rho_R * u_R * physConst.crossSectionalArea;
-                    dPlug(2) = dPlug(1) * physConst.c_v * T_R + ...
-                        0.5 * dPlug(1) * u_R.^2;
                 end
             end
+            
+            % Export RHS function
             obj.RHS = @RHS;
+        end
+        
+        
+        function pStar = sonicPressure(obj, pressure, M)
+            % Compute sonic pressure at given state
+            gamma_ = obj.physConst.gamma;
+            pStar = pressure * ...
+                (((gamma_ + 1)/2) * ...
+                (1 + (gamma-1)/2*M.^2)).^(-gamma/(gamma-1));
         end
         
         % Subsonic port, subsonic firing chamber

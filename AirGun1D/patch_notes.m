@@ -9,6 +9,9 @@
 %           flowL2R = ...
 % -- Monitor exports from ODE solver (or dummy state) instead of using RHS
 %      raw output
+% -- Pass up the shuttle stuff
+% -- Clean up function to reset the bubble frozen boolean
+% -- Check the flow work in both ways for the op chamber
 %
 % -- Note: assume that the port ramps up from 0% to 100% over the entire
 %      operating chamber length. So the operating chamber length is a bit
