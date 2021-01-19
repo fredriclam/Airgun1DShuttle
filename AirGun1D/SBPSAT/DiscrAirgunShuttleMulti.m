@@ -1,10 +1,11 @@
 classdef DiscrAirgunShuttleMulti < DiscrAirgun
     properties
-        shuttle0            % Initial shuttle state [pos; vel]
-        plug0               % Initial plug control volume state [mass; en]
-        machAreaFunction    % Precomputed M(A/A*) function interpolant
-        opChamber
-        bubbleFrozen        % Freeze bubble state until first open to prevent negative bubble pressure
+        shuttle0              % Initial shuttle state [pos; vel]
+        plug0                 % Initial plug control volume state [mass; en]
+        machAreaFunction      % Precomputed M(A/A*) function interpolant
+        chambers              % Object for middle and operating chambers
+        bubbleFrozen          % Freeze bubble state until first open to prevent negative bubble pressure
+        wallClockSetupElapsed % Setup timer
     end
     
     methods
@@ -14,22 +15,31 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 airgunFiringChamberProfile, ...
                 airgunOperatingChamberProfile, bubbleInitialVolume, ...
                 shuttleBdryPenaltyStrength)
+            
+            %% Perform user checks
             if nargin == 8 && ~REVERT_MODEL
-                error('Incorrect # of arguments for unreverted model.')
+                error('Incorrect # of arguments for shuttle-included model.')
             end
             
+            %% Default parameters for this function
             DEBUG = false;
             
+            % Timer
+            wallClockSetupStart = tic();
+            
+            %% Initial setup
             % Call parent constructor
             obj = obj@DiscrAirgun(nx,order,airgunPressure,...
                 airgunLength,airgunPortArea,...
                 airgunDepth);
-            obj.opChamber = OperatingChamber();
+            % Add mid and operating chambers
+            obj.chambers = Chambers();
+            % Reconfigure airgun for coupled model
             if ~REVERT_MODEL
-                % Override the configuration with updated, backward-compatible
-                % setting
-                [physConst, t0, icAirgun, icBubble] = ...
-                    configAirgun('GeneralAirgun', ...
+                % Override configuration with backward-compatible setting
+                [physConst, ~, ~, ~] = ...
+                    configAirgun(...
+                        'GeneralAirgun', ...
                         airgunPressure, ...
                         airgunLength, ...
                         airgunPortArea, ...
@@ -40,6 +50,9 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         bubbleInitialVolume, ...
                         shuttleBdryPenaltyStrength);
                 obj.physConst = physConst;
+                % Replace this object's description
+                obj.description = ...
+                    'Airgun augmented with shuttle + mid and op chambers.';
             end
             
             % Alias commonly used objects
@@ -47,206 +60,92 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             schm = obj.schm;
             gamma_ = physConst.gamma;
             Q_ = physConst.Q;
-            % Replace this object's description
-            obj.description = ...
-                'Airgun augmented with port-region CV and shuttle';
             
+            %% Set initial states
             % Set initial port region state: [p; rho; T]
             % from the initial airgun state
             rho0 = obj.q0(end-2); % Density (rho)
-            rv0 = obj.q0(end-1);  % Rho * v
+            rhov0 = obj.q0(end-1);  % Rho * v
             e0 = obj.q0(end);     % Volumetric stagnation energy e
-            T0 = (e0-0.5*rv0^2/rho0)/physConst.c_v/ rho0; % Temperature
-            p0 = physConst.p0a;   % Initial pressure
+            T0 = (e0-0.5*rhov0^2/rho0)/physConst.c_v/ rho0; % Temperature
             
             % Define initial shuttle state: position; velocity
             % NOTE: position non-zero or else singular--for CV treatment
-            % TODO: check sensitivity
-            % TODO: incorporate initial volume encompassed by shuttle but
-            % not relevant to the port area calculation
             if REVERT_MODEL
-                V_front_max = 0;
-                r = 1;
-                mass_operatChamberAir = 0;
-                x0_rear = 0;
+                xi_0 = 0;
+                gasMassPartitionRatio = 1;
+                massOpChamber = 0;
             else
-                V_front_max = physConst.shuttle_area_right * ...
-                              physConst.operatingChamberLength;
-                x0_rear = 1e-3;
-                mass_operatChamberAir = rho0*V_front_max;
-                r = x0_rear / physConst.operatingChamberLength;
-                disp(['Mass in rear partition: ' ...
-                      num2str(r * mass_operatChamberAir)]);
+                xi_0 = 1e-3;
+                gasMassPartitionRatio = ...
+                    obj.chambers.rearVolume(xi_0) / ...
+                    obj.chambers.totalVolume();
+                massOpChamber = rho0*obj.chambers.totalVolume();
             end
             
-            obj.shuttle0 = [x0_rear; % [m] -- must give rear chamber some room
-                            0;
-                            r * mass_operatChamberAir;
-                            physConst.c_v*T0*(r * mass_operatChamberAir);
-                            (1-r)*mass_operatChamberAir;
-                            physConst.c_v*T0*(1-r)*mass_operatChamberAir;
-                            ];   % [m/s]
-
-            if ~REVERT_MODEL
-                obj.plug0 = [rho0*physConst.plugVolumeFn(obj.shuttle0(1)); % [kg]
-                    rho0*physConst.plugVolumeFn(obj.shuttle0(1))* ...
-                    physConst.c_v*T0];                      % [J]
-            else
-                obj.plug0 = [0; 0];
-            end
+            % Set shuttle initially at rest
+            xi_vel_0 = 0;
+            massRear = gasMassPartitionRatio * massOpChamber;
+            massFront = (1-gasMassPartitionRatio) * massOpChamber;
             
+            % Set initial shuttle state vector
+            obj.shuttle0 = [
+                xi_0; % [m] -- must give rear chamber some room
+                xi_vel_0;
+                massRear;
+                physConst.c_v*T0*massRear;
+                massFront;
+                physConst.c_v*T0*massFront;
+            ];   % [m/s]
+        
+            %% Bubble
+            % Freeze bubble until the port first opens (xi >= xi_t)
             obj.bubbleFrozen = true;
-                       
-                     
+
             %% Create boundary condition operators
+            % Wall BC
             closure_l = schm.boundary_condition('l', 'wall');
             % Outflow with pressure (for unchoked-everywhere flow)
             closure_r_out_sub = schm.boundary_condition('r', 'outflow');
             % Outflow with velocity (for choked flow)
             closure_r_out_sub_vel = ...
                 schm.boundary_condition('r', 'outflow_vel');
-            % Outflow with rho*velocity (alternative to the latter; unused)
-            closure_r_out_sub_rhovel = ...
-                schm.boundary_condition('r', 'outflow_rhovel');
             % Wall on the right
             closure_r_closed = schm.boundary_condition('r', 'wall');
+            
+            %% Precompute
             % Precompute mach area function M(A/A*) and, for subsonic,
             % the mach pressure function M(p/p0)
             if ~REVERT_MODEL
                 obj.machAreaFunction = precomputeMachAreaFunction(gamma_);
             end
             
-            %% Redefine RHS to include evolution of shuttle and port-region
-            function [dq, dBubble, dShuttle, dPlug, p_RTarget, u_RTarget, monitor, shuttleMonitor] = ...
-                    RHS(q, t, bubble, shuttle, plug, p_RTarget, u_RTarget)
-                %% Set flag for bypassing plug modeling
-                BYPASS_PLUG =  true;
-                USE_SHIFT = false;
-                
-                %% Precompute
-                % Compute primitive variables at right of PDE domain
-                if REVERT_MODEL
-                    q_R = schm.e_R'*q;
-                else
-%                     q_R = q(end-5:end-3); % Go one node in for weak enforcement effects
-%                     if sign(q(end-1)) * sign(q_R(2)) < 0
-%                         q_R(2) = 0;
-%                     end
-%                     q_R = schm.e_R'*q;
-                    q_R = q(end-5:end-3); % Go one node in for weak enforcement effects
-                end
+            %% Housekeeping
+            obj.wallClockSetupElapsed = toc(wallClockSetupStart);
+            
+            
 
-                % Replace p_R with target pressure
-                if REVERT_MODEL
-                    p_R = schm.p(q_R);
-                    u_R =  q_R(2)/q_R(1);
-                else
-                    % p_RTarget empty means no pressure enforcement
-                    if ~isempty(p_RTarget)
-                        p_R = p_RTarget;
-                    else
-                        p_R = schm.p(q_R);
-                        if p_R < 0
-                            p_R = schm.p(q(end-8:end-6));
-                        end
-                    end
-                    
-                    if ~isempty(u_RTarget)
-%                         u_R = u_RTarget; % TODO: USE
-                        u_R = q_R(2)/q_R(1);
-                    else
-                        u_R = q_R(2)/q_R(1);
-                    end
-                    
-                                            
-                end
-                % Default to empty target pressure, velocity constraint
-                p_RTarget = [];
-                u_RTarget = [];
-                
+            function agState = fullState(q, t, bubble, shuttle)
+                % Computes the full state of the airgun from the state
+                % vector. Returns a named struct with subsystem variables.
+                % 
+                % Use within RHS function for ODE and for querying state in
+                % post-processing.
+
+                % Compute primitive variables at right of PDE domain
+                q_R = schm.e_R'*q;
+                p_R = schm.p(q_R);
+                u_R = q_R(2)/q_R(1);
                 rho_R = q_R(1);
-                en_R = q_R(3);
-                T_R = p_R / rho_R / Q_;
+                e_tot_R = q_R(3);
+                T_R = schm.T(q_R);
                 c_R = sqrt(physConst.gamma * Q_ * T_R);
                 M_R = u_R / c_R;
                 
-%                 % "Fixing" the supersonic weak enforcement case
-%                 if M_R > 1
-%                     warning('Supersonic capped to sonic.')
-%                     M_R = 1;
-%                     u_R = M_R * c_R;
-%                 end
-                
-                % Compute bubble variables
-                pBubble = bubblePressure(bubble, physConst);
-                TBubble = bubble(4) / physConst.c_v / bubble(3);
-                rhoBubble = pBubble / Q_ / TBubble;
-                % Extract shuttle variables
-                posShuttle = shuttle(1);
-                velShuttle = shuttle(2);
                 % Compute geometry
                 if REVERT_MODEL
-                    % Fixed outlet area
-%                     APortExposed = physConst.APortTotal;
                     % Fix outlet area to equal the cross-sectional area
                     APortExposed = physConst.A;
-                else
-                    % Approximate the total port length as the full travel of
-                    % the shuttle: the % of the travel is thus the % of the
-                    % full port area that is exposed
-                    APortExposed = max([0, physConst.APortTotal * ...
-                        (posShuttle - physConst.portLead) / ...
-                        (physConst.operatingChamberLength - physConst.portLead)]);
-%                     APortExposed = 0;
-
-                    if USE_SHIFT
-                        shiftCounter = 1;
-                        while p_R < 0 || rho_R < 0 || T_R < 0 || M_R < -1e-2
-                            warning('Used next point in boundary.')
-                            % Re-extract from next point
-                            q_R = q(end-2-3*shiftCounter:end-3*shiftCounter);
-                            rho_R = q_R(1);
-                            en_R = q_R(3);
-                            p_R = schm.p(q_R);
-                            T_R = p_R / rho_R / Q_;
-                            c_R = sqrt(physConst.gamma * Q_ * T_R);
-                            M_R = max([0, u_R / c_R]);
-                            
-                            shiftCounter = shiftCounter + 1;
-                            if shiftCounter > 3
-                                warning('Shifted a lot to find positive rho, M')
-                            end
-                        end
-                    end
-                end
-
-                % Initialize local flags for sonic/subsonic this timestep
-                isSonicFlags = [false, false]; % Internal and port
-                
-                % Capture flow state in PDE domain
-                flowState = schm.flowStateR(q);
-                if flowState == scheme.Euler1d.SUBSONIC_INFLOW
-                    if ~REVERT_MODEL || t < physConst.AirgunCutoffTime
-                        if abs(u_R) > 1e-2
-                            warning(['Inflow @ t = ' num2str(t) ...
-                                '; u|x=0 = ' num2str(u_R)]);
-                        end
-                    end
-                elseif flowState == scheme.Euler1d.SUPERSONIC_OUTFLOW
-%                     isSonicFlags(1) = true;
-                end
-                
-                % Compute stagnation pressure
-                p0_R = p_R + 0.5 * rho_R * u_R^2;
-                
-                % reversion: don't trust weak boundary enforcement
-                if REVERT_MODEL
-                    if M_R >= 1
-                        isSonicFlags(1) = true;
-                    end
-                end
-
-                if REVERT_MODEL
                     if t <= physConst.AirgunCutoffTime
                         massFlowPort = rho_R * u_R * APortExposed;
                         velocityPort = u_R;
@@ -258,18 +157,111 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     pPort = p_R;
                     TPort = T_R;
                 else
-                    % Plug flow:
-                    % Split velocity at constant pressure to the plug
-                    if BYPASS_PLUG
-                        uUpstream = u_R;
-                    else
-                        uUpstream = u_R - shuttle(2);
+                    % Approximate the total port length as the full travel of
+                    % the shuttle: the % of the travel is thus the % of the
+                    % full port area that is exposed
+                    APortExposed = max([0, physConst.APortTotal * ...
+                        (posShuttle - physConst.portLead) / ...
+                        (physConst.operatingChamberLength - physConst.portLead)]);
+                    
+                    % Case 0: port is closed
+                    if APortExposed == 0 %|| M_R <= 0
+                        caseKey = 'closedPort'; % Port is closed
+                        massFlowPort = 0;
+                        velocityPort = 0;
+                        rhoPort = pPort / Q_ / TPort;
+                        pPort = p_R;
+                        TPort = T_R;
+                    elseif 
                     end
-%                     
+                       
+%                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
+%                     pBubble % Original issue
                     
-                    
+                end
+                
+                
+                
+                % Compute stagnation pressure
+                p0_R = p_R * ...
+                    (1 + (gamma_ - 1)/2 * ...
+                    M_R^2)^(gamma_/(gamma_-1));
+                               
+                % Capture flow state in PDE domain
+                flowState = schm.flowStateR(q);
+                
+                %% Construct data hierarchy
+                portStates = struct( ...
+                    'APortExposed', APortExposed, ...
+                    'massFlowPort', massFlowPort, ...
+                    'velocityPort', velocityPort, ...
+                    'rhoPort', rhoPort, ...
+                    'pPort', pPort, ...
+                    'TPort', TPort, ...
+                    'caseKey', caseKey ...
+                );
+                eulerDomainStates = struct(...
+                    'q_R', q_R, ...
+                    'p_R', p_R, ...
+                    'u_R', u_R, ...
+                    'rho_R', rho_R , ...
+                    'e_tot_R', e_tot_R, ...
+                    'T_R', T_R, ...
+                    'c_R', c_R, ...
+                    'M_R', M_R, ...
+                    'p0_R', p0_R, ... % Stagnation pressure
+                    'flowState', flowState ...
+                );
+                bubbleStates = struct(...
+                    'R', bubble(1), ...
+                    'RDot', bubble(2), ...
+                    'm', bubble(3), ...
+                    'E', bubble(4) , ...
+                    'p',  bubblePressure(bubble, physConst), ...
+                    'T', bubble(4) / physConst.c_v / bubble(3), ...
+                    'rho', pBubble / Q_ / TBubble ...
+                );
+                shuttleStates = struct(...
+                    'pos', shuttle(1), ...
+                    'vel', shuttle(2) ...
+                );
+            
+                agState = struct(...
+                    't', t, ...
+                    'portStates', portStates, ...
+                    'eulerDomainStates', eulerDomainStates, ...
+                    'bubbleStates', bubbleStates, ...
+                    'shuttleStates', shuttleStates ...
+                );
+            end
+            
+            %% Redefine RHS to include evolution of shuttle and port-region
+            function [dq, dBubble, dShuttle] = ...
+                    RHS(q, t, bubble, shuttle)
+                % RHS function for ode solver
+                
+                %% Set flag for bypassing plug modeling
+                BYPASS_PLUG =  true;
+                
+                %% Compute state dependent variables
+                agState = fullState(q, t, bubble, shuttle);
+                
+                %% Check state
+                assert(agState.eulerDomainStates.p_R > 0);
+                assert(isreal(agState.eulerDomainStates.M_R));
+                assert(~isnan(agState.eulerDomainStates.M_R));
+                % Check for temporary inflow
+                if agState.eulerDomainStates.flowState ...
+                   == scheme.Euler1d.SUBSONIC_INFLOW ...
+                   && (~REVERT_MODEL || t < physConst.AirgunCutoffTime) ...
+                   && abs(agState.eulerDomainStates.u_R) > 1e-2
+                        warning(['Significant inflow @ t = ' num2str(t) ...
+                            '; u|x=0 = ' ...
+                            num2str(agState.eulerDomainStates.u_R)]);
+                end
+                
+                if ~REVERT_MODEL
                     %% Case split
-                    
                     % Case 0: the port is closed.
                     % Conditions:
                     %   - the port area is zero.
@@ -313,19 +305,19 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
 
                     % Case 0: port is closed
                     if APortExposed == 0 %|| M_R <= 0
-                        caseNum = 0; % Port is closed
-                        vel_a = 0;
-                        massFlowPort = 0;
-                        % Smooth continuation
-                        TPort = T_R / temperatureMachFunction(gamma_, 1);
-                        pPort = p_R / pressureMachFunction(gamma_, 1);
-                        rhoPort = pPort / Q_ / TPort;
-%                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
-%                     pBubble % Original issue
+%                         caseNum = 0; % Port is closed
+%                         vel_a = 0;
+%                         massFlowPort = 0;
+%                         % Smooth continuation
+%                         TPort = T_R / temperatureMachFunction(gamma_, 1);
+%                         pPort = p_R / pressureMachFunction(gamma_, 1);
+%                         rhoPort = pPort / Q_ / TPort;
+% %                     elseif p0_R * pressureMachFunction(gamma_, 1) < ...
+% %                     pBubble % Original issue
                     elseif p0_R < pBubble
                         caseNum = 1; % Subsonic
                         if DEBUG
-                            assert(uUpstream >= 0);
+                            assert(u_R >= 0);
                         end          
                         % Mass flow rate is computed using pressure as
                         % influenced by downstream
@@ -350,7 +342,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         caseNum = 3;
                         [velocityPort, pPort, TPort, ...
                             rhoPort, cPort, massFlowPort] ...
-                            = resolveSonicChamber(obj, APortExposed, uUpstream/c_R, p_R, T_R);
+                            = resolveSonicChamber(obj, APortExposed, u_R/c_R, p_R, T_R);
                         isSonicFlags(1) = true;
                     else
                         % Port-choked flow
@@ -361,7 +353,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                             p_R_Used = p_R;
                         end
                         [velUp, pPort, TPort, rhoPort, cPort, massFlowPort]...
-                        = resolveSonicPort(obj, APortExposed, uUpstream/c_R, p_R_Used, T_R);
+                        = resolveSonicPort(obj, APortExposed, u_R/c_R, p_R_Used, T_R);
                         % Add constraint velocity of plug flow
                         if BYPASS_PLUG
                             vel_a = velUp;
@@ -388,29 +380,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     end
                 end
 
-                %% Console output
-                % Just building a string
-                str = sprintf("TIME %.3e", t);
-                if isSonicFlags(1)
-                    str = str + " | INT    SONIC";
-                else
-                    str = str + " | INT SUBSONIC";
-                end
-                if isSonicFlags(2)
-                    str = str + " | PORT    SONIC";
-                else
-                    str = str + " | PORT SUBSONIC";
-                end
-                % Data
-                str = str + " | SHUTPOS: " + sprintf("%.4e", shuttle(1));
-                str = str + " | SHUTVEL: " + sprintf("%.4e", shuttle(2));
-%                 str = str + " | UPORT*: " + sprintf("%.4e", uPortGuess);
-%                 str = str + ...
-%                     " | MdotPORT: " + sprintf("%.4e", massFlowPort);
-%                 str = str + ...
-%                     " | APORT/A*: " + sprintf("%.4e", APortOnASonic);
-%                 fprintf(str + "\n");
-
                 %% State regularization
                 if M_R < 0 && ~REVERT_MODEL
                     if abs(M_R) > 1e-6
@@ -424,44 +393,19 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 % Compute shuttle state evolution
                 % Early data: should be initial ~80g accel
                 if ~REVERT_MODEL
-                    volPlug = physConst.plugVolumeFn(shuttle(1));
-                    assert(volPlug > 0);
-%                     assert(plug(1) > 0);
-%                     assert(plug(2) > 0);
-                    rhoPlug = plug(1) /  volPlug;
-                    TPlug = plug(2) / plug(1) / physConst.c_v;
-                    pPlug = rhoPlug * Q_ * TPlug;                           % TODO: output and complete
-                    % HACK: override pPlug with p_R
-                    pPlug = p_R;
                     % Send boundary pressure to shuttle assembly
                     [dShuttle, pShutRear, pShutFront, pMid, shuttleMonitor] = ...
                         shuttleEvolve(...
                         shuttle, p_R, ...
-                        physConst, obj.opChamber);
+                        physConst, obj.chambers);
                 else
                     dShuttle = 0*shuttle;
                 end
-                
-                % Check for overshoot at weakly enforced sonic BC
-%                 assert(~REVERT_MODEL || u_R < 500)
 
                 %% State monitoring
                 if ~REVERT_MODEL
                     assert(all(isreal([M_R, u_R, c_R, ...
                         massFlowPort])));
-%                     assert(all([M_R, u_R, c_R, ...
-%                         massFlowPort] >= 0));
-                    
-%                     if APortExposed > 0
-%                         uPort = massFlowPort/(rhoPort * APortExposed);
-%                     else
-%                         uPort = 0;
-%                     end
-%                     M_port = uPort / sqrt(gamma_ * Q_ * TPort);
-%                     monitor(11,1) = p0_R * pressureMachFunction(gamma_, 1) / pBubble;
-%                     monitor(12,1) = pCrit;
-%                     monitor(14,1) = dShuttle(2) * physConst.shuttleAssemblyMass * shuttle(2);
-            
 
                     if caseNum == 0
                         exportedpTarget = NaN;
@@ -561,7 +505,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 end
                 % Compute port specific stagnation energy
                 if REVERT_MODEL
-                    ePort = en_R;
+                    ePort = e_R;
                 else
                     % Compute total energy per volume
                     ePort = rhoPort * physConst.c_v * TPort + ...
@@ -601,9 +545,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             end
             obj.RHS = @RHS;
         end
-        
-        
-        
         
         % Subsonic port, subsonic firing chamber
         % Bubble parameters matter; information can propagate upstream.
@@ -646,9 +587,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             % plug flow
             MUpstream = max([0, MUpstream]);
 
-            %% Take positive part of the exposed area
-            APortExposed = max([0, APortExposed]);
-
             %% Compute upstream pressure from downstream information [V1]
             gamma_ = obj.physConst.gamma;
             Q_ = obj.physConst.Q;
@@ -682,9 +620,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
         function [MUpstream, rhoPort, TTotal]..., TPort, rhoPort, cPort, massFlowPort] ...
                  = resolveSubsonicVelocity(obj, APortExposed, ...
                 pUpstream, TUpstream, pDownstream)
-            %% Take positive part of the exposed area
-            APortExposed = max([0, APortExposed]);
-
             %% Compute upstream pressure from downstream information [V1]
             gamma_ = obj.physConst.gamma;
             Q_ = obj.physConst.Q;
@@ -699,25 +634,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             TTotal = TUpstream / temperatureMachFunction(gamma_, MUpstream);             % Q: Which one to use?
             
             rhoPort = pTotal / (Q_ * TTotal);
-            
-%             % Compute sonic area from upstream
-%             ASonic = obj.physConst.crossSectionalArea / ...
-%                 areaMachFunction(gamma_, MUpstream);
-%             % Use relative area for M Port
-%             MPort = obj.machAreaFunction(APortExposed/ASonic);
-%             % Compute the rest of the state at port
-%             TPort = TTotal * temperatureMachFunction(gamma_, MPort);
-%             cPort = sqrt(gamma_ * Q_ * TPort);
-%             pPort = pTotal * pressureMachFunction(gamma_, MUpstream);
-%             rhoPort = pPort / (Q_ * TPort);
-%             massFlowPort = MPort * cPort * rhoPort * APortExposed;
-%             
-%             % Compute chamber exit velocity (just unwinding the Mach #)
-%             vel_a = MUpstream * sqrt(gamma_ * Q_ * TUpstream);
         end
-        
-        
-        
         
         % Subsonic port, subsonic firing chamber
         % Bubble parameters matter; information can propagate upstream.
@@ -802,12 +719,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             massFlowRate = rhoDownstream * MDownstream * cDownstream * ...
                 ADownstream;
         end
-        
-        
-        
-        
-        
-        
         
         % Sonic port, subsonic firing chamber
         % Computes the velocity boundary condition on the PDE domain
