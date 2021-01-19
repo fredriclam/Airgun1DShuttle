@@ -1,7 +1,10 @@
-% Launch script for testing the airgun model with shuttle.
+
+
+% Main script for orchestrating code runs of airgun model with shuttle.
+% 
 % Uses SBPlib to set up the 1D Euler domain for the interior of the airgun
 % firing chamber. Adds the model for the port area between the airgun
-% domain and the bubble.
+% domain and the bubble. Adapted from WIP test_launch_script_v1.m script.
 
 clear; clc;
 addpath .\FlowRelations
@@ -53,6 +56,25 @@ airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
     airgunOperatingChamberProfile, bubbleInitialVolume, ...
     shuttleBdryPenaltyStrength);
 t = sol.x; % time
+
+%% Postprocess 1: Plot closed chamber evolution
+monitor_postprocessing(monitorStates)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+return
 
 %% Post processing
 gamma = 1.4;
