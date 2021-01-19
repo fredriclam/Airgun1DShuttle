@@ -1,15 +1,36 @@
 % Runs coupled Euler codes simultaenously for both the shuttle-coupled
 % model and the instant-open, shuttle-free model.
+%
+% Input:
+%   nx -- Number of grid points to use per meter
+%   paramAirgun -- Struct of airgun parameters
+%   metadata -- (optional) metadata struct to append to
 
 function [sol, q1, bubble1, shuttle1, plug1, ...
-    q2, bubble2, shuttle2, plug2, monitorStates] = ...
-    runEulerCodeShuttleDual(nx,airgunPressure,...
-    airgunLength,airgunCrossSecArea,airgunPortArea,airgunDepth, ...
-    airgunFiringChamberProfile, ...
-    airgunOperatingChamberProfile, bubbleInitialVolume, ...
-    shuttleBdryPenaltyStrength)
+    q2, bubble2, shuttle2, plug2, monitorStates, metadata] = ...
+    runEulerCodeShuttleDual(nx,paramAirgun,metadata)
 
-    % Initialize airgun models (reverted and new model)
+    %% User checking and unpacking input parameters
+    if nargin < 2 || nargin > 3
+        error("Unknown number of parameters provided.");
+    end
+    
+    try
+        airgunPressure = paramAirgun.airgunPressure;
+        airgunLength = paramAirgun.airgunPressure;
+        airgunCrossSecArea = paramAirgun.airgunCrossSecArea;
+        airgunPortArea = paramAirgun.airgunPortArea;
+        airgunDepth = paramAirgun.airgunDepth;
+        airgunFiringChamberProfile = paramAirgun.airgunFiringChamberProfile;
+        airgunOperatingChamberProfile = paramAirgun.airgunOperatingChamberProfile;
+        bubbleInitialVolume = paramAirgun.bubbleInitialVolume;
+        shuttleBdryPenaltyStrength = paramAirgun.shuttleBdryPenaltyStrength;
+    catch
+        error("Error unpacking airgun parameters. " ...
+              + "Some values may not be specified.");
+    end
+
+    %% Initialize airgun models (reverted and new model)
     orderSBP = 3;
     dRevert = DiscrAirgunShuttleMulti(nx,orderSBP,airgunPressure,airgunLength, ...
         airgunPortArea,airgunDepth,0,true);
