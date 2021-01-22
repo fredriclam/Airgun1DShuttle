@@ -20,7 +20,7 @@ tspan = [0; 0.100];
 runShuttleFreeFlag = false;
 
 %% Set ambient parameters
-nx = 100;                                         % Number of grid points per 1 m of air gun length
+nx = 20;                % Default: 100           % Number of grid points per 1 m of air gun length
 r = 10;                                           % Distance from source to receiver [m]
 c_inf = 1482;                                     % Speed of sound in water [m/s]
 rho_inf = 1000;                                   % Density of water [kg/m^3]
@@ -77,10 +77,14 @@ metadata = struct(...
 [solution, metadata, solShuttleFree] = ...
     runEulerCodeShuttleDual(nx, tspan, ...
                             paramAirgun, runShuttleFreeFlag, metadata);
-t = sol.x; % time
 
 %% Postprocess 1: Plot closed chamber evolution
-monitor_postprocessing(monitorStates)
+% TODO: Implement chambers passing data
+% TODO: Implement passing exceptions
+% TODO: Implement use of post-processing in Chambers
+% TODO: Post check of boundary conditions in the real solution time points
+% monitor_postprocessing(monitorStates)
+
 
 
 

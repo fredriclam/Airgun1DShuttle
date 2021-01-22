@@ -20,7 +20,7 @@ function [solution, metadata, solShuttleFree] = ...
                             runShuttleFreeFlag,metadata)
     %% Defaults for this function
     % Plot every [s]
-    PLOT_INTERVAL = 1e-3;
+    PLOT_INTERVAL = 0*1e-4;
     REL_TOL = 1e-4;
                         
     %% User checking and unpacking input parameters
@@ -37,7 +37,7 @@ function [solution, metadata, solShuttleFree] = ...
     
     try
         airgunPressure = paramAirgun.airgunPressure;
-        airgunLength = paramAirgun.airgunPressure;
+        airgunLength = paramAirgun.airgunLength;
         airgunCrossSecArea = paramAirgun.airgunCrossSecArea;
         airgunPortArea = paramAirgun.airgunPortArea;
         airgunDepth = paramAirgun.airgunDepth;
@@ -104,6 +104,20 @@ function [solution, metadata, solShuttleFree] = ...
             plot(discretization.schm.x(2:3:end), u);
             ylabel('u [m/s]')
             title(num2str(t))
+            hold on
+            fs = discretization.fullState(q, t, bubble, shuttle, false);
+            if strcmpi(fs.portStates.caseKey, 'portChoked')
+                plot(discretization.schm.x(2:3:end), ...
+                    fs.portStates.velocityPort*...
+                      ones(size(discretization.schm.x(2:3:end))), ...
+                    '--r');
+            elseif strcmpi(fs.portStates.caseKey, 'chamberChokedForced')
+                plot(discretization.schm.x(2:3:end), ...
+                    fs.portStates.velocityPort*...
+                      ones(size(discretization.schm.x(2:3:end))), ...
+                    '--b');
+            end
+            hold off
             
             %% Temperature plot
             subplot(3,1,2);
@@ -127,6 +141,10 @@ function [solution, metadata, solShuttleFree] = ...
 
     y0 = [q0; bubble0; shuttle0];
 
+    % On setup completion
+    metadata.wallClockSetupElapsed = toc(wallClockStart);    
+    disp('Setup complete. Starting ODE solver.')
+    
     %% Run ODE solver
     % Set ODE solver options
     options = odeset('RelTol',REL_TOL);
@@ -211,6 +229,6 @@ function [solution, metadata, solShuttleFree] = ...
     
     % End wall clock timer
     
-    metadata.wallClockElapsed = toc(wallClockStart);
+    metadata.wallClockTotalElapsed = toc(wallClockStart);
 end
 

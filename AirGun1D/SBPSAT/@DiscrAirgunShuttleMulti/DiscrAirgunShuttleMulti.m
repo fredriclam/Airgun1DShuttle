@@ -112,6 +112,10 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 schm.boundary_condition('r', 'outflow_vel');
             % Wall on the right
             closure_r_closed = schm.boundary_condition('r', 'wall');
+            % Characteristic boundary on the right
+            closure_r_char = schm.boundary_condition('r', 'char');
+            
+            closure_r_out_rho = schm.boundary_condition('r', 'outflow_rho');
             
             %% Precompute
             % Precompute mach area function M(A/A*) and, for subsonic,
@@ -123,177 +127,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             %% Housekeeping
             obj.wallClockSetupElapsed = toc(wallClockSetupStart);
             
-            
-
-            function agState = fullState(q, t, bubble, shuttle)
-                % Computes the full state of the airgun from the state
-                % vector. Returns a named struct with subsystem variables.
-                % 
-                % Use within RHS function for ODE and for querying state in
-                % post-processing.
-
-                % Compute primitive variables at right of PDE domain
-                q_R = schm.e_R'*q;
-                p_R = schm.p(q_R);
-                u_R = q_R(2)/q_R(1);
-                rho_R = q_R(1);
-                e_tot_R = q_R(3);
-                T_R = (e_tot_R - 0.5 * rho_R * u_R^2) / rho_R / physConst.c_v;
-                c_R = sqrt(physConst.gamma * Q_ * T_R);
-                M_R = u_R / c_R;
-                
-                % Compute stagnation pressure
-                p0_R = p_R * ...
-                    (1 + (gamma_ - 1)/2 * ...
-                    M_R^2)^(gamma_/(gamma_-1));
-                               
-                % Capture flow state in PDE domain
-                flowState = schm.flowStateR(q);
-                
-                % Create empty note string
-                noteString = "";
-                
-                % Compute geometry
-                if REVERT_MODEL
-                    caseKey = 'noShuttle';
-                    % Fix outlet area to equal the cross-sectional area
-                    APortExposed = physConst.A;
-                    if t <= physConst.AirgunCutoffTime
-                        massFlowPort = rho_R * u_R * APortExposed;
-                        velocityPort = u_R;
-                    else
-                        massFlowPort = 0;
-                        velocityPort = 0;
-                    end
-                    rhoPort = rho_R;
-                    pPort = p_R;
-                    TPort = T_R;
-                else
-                    % Approximate the total port length as the full travel of
-                    % the shuttle: the % of the travel is thus the % of the
-                    % full port area that is exposed
-                    APortExposed = max([0, physConst.APortTotal * ...
-                        (shuttle(1) - physConst.portLead) / ...
-                        (physConst.operatingChamberLength - physConst.portLead)]);
-                    
-                    % Case dependent boundary values
-                    if APortExposed == 0 % Case 0: port is closed
-                        caseKey = 'portClosed'; % Port is closed
-                        massFlowPort = 0;
-                        velocityPort = 0;
-                        pPort = p_R;
-                        TPort = T_R;
-                        rhoPort = pPort / Q_ / TPort;
-                    elseif p0_R < bubblePressure(bubble, physConst)
-                        caseKey = 'subsonic';
-                        [MTarget, rhoPort, TPort] = ...
-                            resolveSubsonicVelocity(obj, ...
-                               APortExposed, p_R, T_R, pBubble);
-                        massFlowPort = rho_R * u_R * ...
-                            physConst.crossSectionalArea;
-                        % Enforce pressure continuity through port
-                        pPort = bubblePressure(bubble, physConst);
-                    elseif APortExposed > physConst.crossSectionalArea
-                        caseKey = 'chamberChoked';
-                        [velocityPort, pPort, TPort, ...
-                            rhoPort, cPort, massFlowPort] ...
-                            = resolveSonicChamber(obj, APortExposed, ...
-                            u_R/c_R, p_R, T_R);                        
-                    else
-                        caseKey = 'portChoked';
-                        [u_RTarget, pPort, TPort, rhoPort, cPort, massFlowPort]...
-                        = resolveSonicPort(obj, APortExposed, u_R/c_R, p_R, T_R);
-                        velocityPort = massFlowPort / (rhoPort * APortExposed);
-                    end
-                    
-                    if  flowState == scheme.Euler1d.SUPERSONIC_OUTFLOW ...
-                            && ~strcmpi ('chamberChoked', caseKey)
-                        noteString = noteString + ...
-                            "Chamber should not be choked but it is";
-                    end
-                       
-                % Compute port total energy per unit volume
-                eTotalPort = rhoPort * physConst.c_v * TPort ...
-                    + 0.5 * rhoPort * velocityPort^2;
-                end
-                % Compute port sound speed
-                cPort = sqrt(physConst.gamma * physConst.Q * TPort);
-                
-                % Compute primitives everywhere in Euler domain
-                pEulerDomain = NaN(size(q(1:3:end)));
-                for i = 1:length(pEulerDomain)
-                    pEulerDomain(i) = schm.p(q(1+3*(i-1):3+3*(i-1)));
-                end
-                rhoEulerDomain = q(1:3:end);
-                uEulerDomain = q(2:3:end) ./ q(1:3:end);
-                eEulerDomain = q(3:3:end);
-                TEulerDomain = (eEulerDomain ./ rhoEulerDomain ...
-                       - 0.5 * uEulerDomain.^2) / physConst.c_v;
-                cEulerDomain = sqrt(physConst.gamma * physConst.Q * TEulerDomain);
-                MEulerDomain = uEulerDomain ./ cEulerDomain;
-                
-                %% Construct data hierarchy
-                portStates = struct( ...
-                    'APortExposed', APortExposed, ...
-                    'massFlowPort', massFlowPort, ...
-                    'velocityPort', velocityPort, ...
-                    'rhoPort', rhoPort, ...
-                    'pPort', pPort, ...
-                    'TPort', TPort, ...
-                    'cPort', cPort, ...
-                    'MPort', velocityPort/cPort, ...
-                    'eTotalPort', eTotalPort, ...
-                    'caseKey', caseKey, ...
-                    'ARatio', APortExposed / physConst.crossSectionalArea ...
-                );
-                eulerDomainStates = struct(...
-                    'rho', rhoEulerDomain, ...
-                    'u', uEulerDomain, ...
-                    'e', eEulerDomain, ...
-                    'p', pEulerDomain, ...
-                    'T', TEulerDomain, ...
-                    'c', cEulerDomain, ...
-                    'M', MEulerDomain, ...
-                    'q_R', q_R, ...
-                    'p_R', p_R, ...
-                    'u_R', u_R, ...
-                    'rho_R', rho_R , ...
-                    'e_tot_R', e_tot_R, ...
-                    'T_R', T_R, ...
-                    'c_R', c_R, ...
-                    'M_R', M_R, ...
-                    'p0_R', p0_R, ... % Stagnation pressure
-                    'flowState', flowState, ...
-                    'matrix_T_at_x_R', schm.T(q_R), ...
-                    'characteristics_at_x_R', schm.T(q_R) \ q_R ...
-                );
-                bubbleStates = struct(...
-                    'R', bubble(1), ...
-                    'RDot', bubble(2), ...
-                    'm', bubble(3), ...
-                    'E', bubble(4) , ...
-                    'p',  bubblePressure(bubble, physConst), ...
-                    'T', bubble(4) / physConst.c_v / bubble(3) ...
-                );
-                bubbleStates.rho = bubbleStates.p / ...
-                    (physConst.Q * bubbleStates.T); 
-                shuttleStates = struct(...
-                    'pos', shuttle(1), ...
-                    'vel', shuttle(2) ...
-                );
-            
-                agState = struct(...
-                    't', t, ...
-                    'portStates', portStates, ...
-                    'eulerDomainStates', eulerDomainStates, ...
-                    'bubbleStates', bubbleStates, ...
-                    'shuttleStates', shuttleStates, ...
-                    'noteString', noteString ...
-                );
-                figure(101);
-                plot(schm.u,agState.eulerDomainStates.T); drawnow;
-            end
-            
             %% Redefine RHS to include evolution of shuttle and port-region
             function [dq, dBubble, dShuttle] = ...
                     RHS(q, t, bubble, shuttle)
@@ -303,10 +136,12 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 BYPASS_PLUG =  true;
                 
                 %% Compute state dependent variables
-                agState = fullState(q, t, bubble, shuttle);
+                agState = obj.fullState(q, t, bubble, shuttle, REVERT_MODEL);
                 
                 %% Check state
                 assert(agState.eulerDomainStates.p_R > 0);
+                assert(agState.eulerDomainStates.T_R > 0);
+                assert(agState.eulerDomainStates.rho_R > 0);
                 assert(isreal(agState.eulerDomainStates.M_R));
                 assert(~isnan(agState.eulerDomainStates.M_R));
                 assert(agState.eulerDomainStates.T_R > 0 && ...
@@ -527,36 +362,45 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_out_sub(q, agStates.bubbleStates.p);
                     end
                 else
-%                     % Working code
-%                     if strcmpi('portClosed', ...
-%                             agState.portStates.caseKey)
-%                         % Closed end when A_port = 0
-%                         dq = dq + closure_r_closed(q);
-%                     elseif strcmpi('subsonic', ...
-%                             agState.portStates.caseKey)
-%                         % Pressure boundary condition up
-% %                         dq = dq + closure_r_out_sub(q, pTarget);
-%                         disp("Subsonic u condition:" + MTarget*c_R);
-%                         dq = dq + closure_r_out_sub_vel(q, MTarget*c_R);
-%                     elseif strcmpi('portChoked', ...
-%                             agState.portStates.caseKey)
-%                         if agState.portStates.velocityPort <= 0 % TODO: This needs to checked CHECK: check this
-%                             dq = dq + closure_r_closed(q);
-%                         else
-%                             if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
-%                                 % Set velocity boundary condition TODO:
-%                                 % consider momentum boundary condition
-%                                 dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
-%                             end
-%                         end
-%                     end
-                    
-                    % Testing: shock the BC
-                    if t < 0.001
+                    % Working code
+                    if strcmpi('portClosed', ...
+                            agState.portStates.caseKey)
+                        % Closed end when A_port = 0
                         dq = dq + closure_r_closed(q);
-                    else
-                        dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+                    elseif strcmpi('subsonic', ...
+                            agState.portStates.caseKey)
+                        % Pressure boundary condition up
+%                         dq = dq + closure_r_out_sub(q, pTarget);
+                        dq = dq + closure_r_out_sub_vel(q, ...
+                            agState.portStates.velocityPort);
+                        % Solo pressure boundary condition
+%                         dq = dq + closure_r_out_sub(q, agState.portStates.p);
+                    elseif strcmpi('portChoked', ...
+                            agState.portStates.caseKey)
+                        if agState.portStates.velocityPort <= 0
+                            warning('port choked back flow')
+                            dq = dq + closure_r_closed(q);
+                        else
+                            if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
+                                % Set velocity boundary condition TODO:
+                                % consider momentum boundary condition
+%                                 dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+                                dq = dq + closure_r_out_rho(q, agState.portStates.rhoPort);
+
+%                                 dq = dq + closure_r_char(q, agState.portStates.wPort);
+%                                 dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
+                            else
+                                warning('log supsonic outflow AND sonic port')
+                            end
+                        end
                     end
+                    
+%                     % Testing: shock the BC
+%                     if t < 0.001
+%                         dq = dq + closure_r_closed(q);
+%                     else
+%                         dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+%                     end
                 end
                 
                 if ~all(isreal(dq))
@@ -586,7 +430,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         obj.bubbleFrozen = false;
                     end
                     
-                    assert(dBubble(3) >= 0)
+%                     assert(dBubble(3) >= 0)
                 end
             end
             
@@ -594,6 +438,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             obj.RHS = @RHS;
         end
         
+        % Declare state computation function
+        agState = fullState(obj, q, t, bubble, shuttle, REVERT_MODEL)
         
         function pStar = sonicPressure(obj, pressure, M)
             % Compute sonic pressure at given state
@@ -777,6 +623,29 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 ADownstream;
         end
         
+        function [MUpstream, exception] = mapChokedPortAreaRatioToM(...
+                obj, APortExposed)
+            exception = [];
+            
+            % Take exposed port area as the sonic area
+            A_sonic = APortExposed;
+            areaRatio = obj.physConst.crossSectionalArea / A_sonic;
+            if areaRatio < 1
+                exception = struct(...
+                    'message', ...
+                    'Critical: area ratio is invalid for this case.', ...
+                    'details', ['Area ratio must be >= 1 assuming' ...
+                                'subsonic upstream (contraction to' ...
+                                'sonic)'], ...
+                    'areaRatio', areaRatio ...
+                );
+                MUpstream = 0;
+                error(exception);
+            else
+                MUpstream = obj.machAreaFunction(areaRatio);
+            end
+        end
+        
         % Sonic port, subsonic firing chamber
         % Computes the velocity boundary condition on the PDE domain
         % Input:
@@ -803,11 +672,11 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             % current port area
             A_sonic = max([0,APortExposed]);            
             
-            % Numerical tolerancing
-            if obj.physConst.crossSectionalArea / A_sonic > 1 ...
-                && obj.physConst.crossSectionalArea / A_sonic < 1.2
-                A_sonic = obj.physConst.crossSectionalArea;
-            end
+%             % Numerical tolerancing
+%             if obj.physConst.crossSectionalArea / A_sonic > 1 ...
+%                 && obj.physConst.crossSectionalArea / A_sonic < 1.2
+%                 A_sonic = obj.physConst.crossSectionalArea;
+%             end
             
             % Compute chamber outlet velocity as dependent
             if APortExposed <= 0
@@ -816,8 +685,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 % Compute upstream mach number (set M_a as
                 % boundary condition)
                 areaRatio = obj.physConst.crossSectionalArea / A_sonic;
-                % Fix the area ratio
-                areaRatio = max(areaRatio, 1);
+%                 % Fix the area ratio
+%                 areaRatio = max(areaRatio, 1);
                 M_a = obj.machAreaFunction(areaRatio);
                 vel_a = M_a * sqrt(gamma_ * Q_ * T_R);
             end            
