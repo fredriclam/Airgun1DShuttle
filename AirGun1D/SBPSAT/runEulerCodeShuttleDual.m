@@ -142,7 +142,7 @@ function [solution, metadata, solShuttleFree] = ...
     y0 = [q0; bubble0; shuttle0];
 
     % On setup completion
-    metadata.wallClockSetupElapsed = toc(wallClockStart);    
+    metadata.wallClockSetupSeconds = toc(wallClockStart);    
     disp('Setup complete. Starting ODE solver.')
     
     %% Run ODE solver
@@ -229,6 +229,6 @@ function [solution, metadata, solShuttleFree] = ...
     
     % End wall clock timer
     
-    metadata.wallClockTotalElapsed = toc(wallClockStart);
+    metadata.wallClockTotalSeconds = toc(wallClockStart);
 end
 

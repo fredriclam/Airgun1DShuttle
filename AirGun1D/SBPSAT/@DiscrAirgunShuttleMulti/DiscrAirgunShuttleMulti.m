@@ -362,45 +362,47 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_out_sub(q, agStates.bubbleStates.p);
                     end
                 else
-                    % Working code
-                    if strcmpi('portClosed', ...
-                            agState.portStates.caseKey)
-                        % Closed end when A_port = 0
-                        dq = dq + closure_r_closed(q);
-                    elseif strcmpi('subsonic', ...
-                            agState.portStates.caseKey)
-                        % Pressure boundary condition up
-%                         dq = dq + closure_r_out_sub(q, pTarget);
-                        dq = dq + closure_r_out_sub_vel(q, ...
-                            agState.portStates.velocityPort);
-                        % Solo pressure boundary condition
-%                         dq = dq + closure_r_out_sub(q, agState.portStates.p);
-                    elseif strcmpi('portChoked', ...
-                            agState.portStates.caseKey)
-                        if agState.portStates.velocityPort <= 0
-                            warning('port choked back flow')
-                            dq = dq + closure_r_closed(q);
-                        else
-                            if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
-                                % Set velocity boundary condition TODO:
-                                % consider momentum boundary condition
-%                                 dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
-                                dq = dq + closure_r_out_rho(q, agState.portStates.rhoPort);
-
-%                                 dq = dq + closure_r_char(q, agState.portStates.wPort);
-%                                 dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
-                            else
-                                warning('log supsonic outflow AND sonic port')
-                            end
-                        end
-                    end
-                    
-%                     % Testing: shock the BC
-%                     if t < 0.001
+%                     % Working code
+%                     if strcmpi('portClosed', ...
+%                             agState.portStates.caseKey)
+%                         % Closed end when A_port = 0
 %                         dq = dq + closure_r_closed(q);
-%                     else
-%                         dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+%                     elseif strcmpi('subsonic', ...
+%                             agState.portStates.caseKey)
+%                         % Pressure boundary condition up
+% %                         dq = dq + closure_r_out_sub(q, pTarget);
+%                         dq = dq + closure_r_out_sub_vel(q, ...
+%                             agState.portStates.velocityPort);
+%                         % Solo pressure boundary condition
+% %                         dq = dq + closure_r_out_sub(q, agState.portStates.p);
+%                     elseif strcmpi('portChoked', ...
+%                             agState.portStates.caseKey)
+%                         if agState.portStates.velocityPort <= 0
+%                             warning('port choked back flow')
+%                             dq = dq + closure_r_closed(q);
+%                         else
+%                             if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
+%                                 % Set velocity boundary condition TODO:
+%                                 % consider momentum boundary condition
+% %                                 dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+%                                 dq = dq + closure_r_out_rho(q, agState.portStates.rhoPort);
+% 
+% %                                 dq = dq + closure_r_char(q, agState.portStates.wPort);
+% %                                 dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
+%                             else
+%                                 warning('log supsonic outflow AND sonic port')
+%                             end
+%                         end
 %                     end
+                    
+                    % Testing: shock the BC
+                    if t < 0
+                        dq = dq + closure_r_closed(q);
+                    else
+                        agState = fullState(...
+                            obj, q, t, bubble, [1.1*obj.physConst.portLead; 0], REVERT_MODEL);
+                        dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+                    end
                 end
                 
                 if ~all(isreal(dq))

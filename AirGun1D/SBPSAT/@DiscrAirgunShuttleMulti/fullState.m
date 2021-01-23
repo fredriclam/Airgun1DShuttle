@@ -129,31 +129,62 @@ else
                 (1/((obj.physConst.gamma - 1)*obj.physConst.gamma))...
                 * (q(2)^2) / (q(1)*q(3) - 0.5*q(2)^2) ...
             );
+            enforcement.mapq2characteristicsStatic = @(q) obj.schm.T(q_R) \ q;
             enforcement.mapq2characteristics = @(q) obj.schm.T(q) \ q;
             
             essentialConstraint = @(q) ...
                 enforcement.mapq2M(q) - MPort;
-            outgoingCharBCConstraints = @(q) ...
-                enforcement.P ...
-                * (enforcement.mapq2characteristics(q) ...
-                   - enforcement.mapq2characteristics(q_R));
-            % Add scaling to equation system to give weight to essential
-            % constraint
-            scalingMatrix = diag([max(1,min(1e5,1/M_R)), 1, 1]);
-            scaledConstraintSystem = @(q) scalingMatrix * [
-                essentialConstraint(q);
-                outgoingCharBCConstraints(q);
-            ];
-        
-            % Solve constraint system
-            [qPort, constraintVals, exitFlag] = fsolve(...
-                scaledConstraintSystem, q_R, ...
-                optimoptions('fsolve','display','none'));
-            if exitFlag ~=1
+            %% Multi-D fsolve with any type of eigenvector
+            if false
+                outgoingCharBCConstraints = @(q) ...
+                    enforcement.P ...
+                    * (enforcement.mapq2characteristicsStatic(q) ...
+                    - enforcement.mapq2characteristicsStatic(q_R));
+                % Add scaling to equation system to give weight to essential
+                % constraint
+                scalingMatrix = diag([max(1,min(1e3,1/M_R)), 1e6, 1e6]);
+                unscaledConstraintSystem = @(q) [
+                    essentialConstraint(q);
+                    outgoingCharBCConstraints(q);
+                    ];
+                
+                % Solve constraint system
+                [qPort, constraintVals, exitFlag] = fsolve(...
+                    @(q) scalingMatrix * unscaledConstraintSystem(q), ...
+                    q_R, ...
+                    optimoptions('fsolve', ...
+                    'display','none', ...
+                    'FunctionTolerance', 1e-7, ...
+                    'OptimalityTolerance', 1e-10, ...
+                    'MaxFunctionEvaluations', 10000, ...
+                    'MaxIterations', 10000, ...
+                    'FiniteDifferenceType', 'central' ...
+                    )...
+                    );
+            end
+            
+            %% 1-D fsolve with static eigenvectors
+            % Deviations from q_R live in the null space of
+            B = enforcement.P / (obj.schm.T(q_R));
+            nullVector = null(B);
+            if size(nullVector,2) > 1
+                error('Nullity of characteristics preservation > 1. Unexpected!')
+            end
+            
+            % Feasible space for new q to meet the essential constraint
+            qConstrained = @(deviationScalar) q_R + deviationScalar*nullVector;
+            
+            [deviationScalar, ~, exitFlag] = ...
+                fzero(@(deviationScalar) ...
+                      essentialConstraint(qConstrained(deviationScalar)), 0);
+            qPort = q_R + deviationScalar * nullVector;                  
+                  
+            % fsolve error checking
+            if exitFlag ~=1 && exitFlag ~= 2
                 warning('Possible problem solving system. Help!')
             end
             
-            % Compute primitives
+            %% Compute primitives
             pPort = obj.schm.p(qPort);
             velocityPort = qPort(2)/qPort(1);
             rhoPort = qPort(1);

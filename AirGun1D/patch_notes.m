@@ -38,3 +38,43 @@
 %    -- Initial wigglies for double-wall condition (left and right closed)
 %    -- Tiny drop in pressure, w required for the initial acceleration of
 %    gas. Need to enforce in u, and look into this further.
+
+% Notes:
+% -- Sensitivity of w solve:
+% Scaling matrix of [M - MPort; w_u - w_uPort; w_{u+c} - w_{u+c}Port] varies
+% in the following (same tolerances)
+%
+%   Scaling values of [1e5, 1, 1] lead to q of
+%   1.0e+07 *
+%   0.000001507752336
+%   0.000016481027984
+%  1.724523832767844
+% 
+%  qStar1 = fsolve(...
+%    @(q) diag([1 1 1]) * [
+% essentialConstraint(q);
+% outgoingCharBCConstraints(q);
+% ], q_R, optimoptions('fsolve','FunctionTolerance', 1e-13, 'OptimalityTolerance', 1e-13));
+%  
+% 
+% qStar1 =
+% 
+%    1.0e+07 *
+% 
+%    0.000001507679872
+%    0.000016480573451
+%    1.724511594529822
+% 
+%  qStar2 = fsolve(...
+% @(q) diag([1 1e5 1e5]) * [
+% essentialConstraint(q);
+% outgoingCharBCConstraints(q);
+% ], q_R, optimoptions('fsolve','FunctionTolerance', 1e-13, 'OptimalityTolerance', 1e-13));
+% 
+% 
+% Equation solved, solver stalled.
+% 1.0e+07 *
+% 
+%    0.000003856089409
+%    0.000022398504588
+%    1.245436385885649
