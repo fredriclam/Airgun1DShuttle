@@ -362,7 +362,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_out_sub(q, agStates.bubbleStates.p);
                     end
                 else
-%                     % Working code
+                    % Working code
 %                     if strcmpi('portClosed', ...
 %                             agState.portStates.caseKey)
 %                         % Closed end when A_port = 0
