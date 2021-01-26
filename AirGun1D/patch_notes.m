@@ -18,6 +18,7 @@
 % -- Note: assume that the port ramps up from 0% to 100% over the entire
 %      operating chamber length. So the operating chamber length is a bit
 %      shorter than it is. Let's check this.
+% -- Check if using different BC matters (eg enforce using u, p or rho)
 %
 % In final code:
 % -- Check venting valve extreme cases (closed chamber at ambient pressure,
@@ -78,3 +79,6 @@
 %    0.000003856089409
 %    0.000022398504588
 %    1.245436385885649
+ % 
+% DOCUMENT: Use of simple enforcement is not quite right and
+            % (MIGHT be the thing that) leads to these jump cases

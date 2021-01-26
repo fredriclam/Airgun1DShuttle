@@ -28,8 +28,10 @@ end
     function outputM = interpolateM(inputA)
         % Input validation
         if inputA < min(areaRatioVector)
-            error("precomputeMachAreaFunction: Outside of precomputed "...
-                + "area ratio domain. Try again with larger N.")
+            % Suppress any areas and return closest limit value
+            inputA = 1;
+%             error("precomputeMachAreaFunction: Outside of precomputed "...
+%                 + "area ratio domain. Try again with larger N.")
         end
         if inputA > max(areaRatioVector)
             % Use asymptotic formula (< 1e-15 absolute error with N = 2.5e4)
