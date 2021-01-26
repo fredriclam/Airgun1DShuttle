@@ -203,10 +203,12 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                             agState.portStates.caseKey)
                         % Pressure boundary condition up
 %                         dq = dq + closure_r_out_sub(q, pTarget);
-                        dq = dq + closure_r_out_sub_vel(q, ...
-                            agState.portStates.velocityPort);
+%                         dq = dq + closure_r_out_sub_vel(q, ...
+%                             agState.portStates.velocityPort);
                         % Solo pressure boundary condition
 %                         dq = dq + closure_r_out_sub(q, agState.portStates.p);
+                        dq = dq + closure_r_out_sub(q, ...
+                            agState.portStates.pPort);
                     elseif strcmpi('portChoked', ...
                             agState.portStates.caseKey)
                         if agState.portStates.velocityPort <= 0
