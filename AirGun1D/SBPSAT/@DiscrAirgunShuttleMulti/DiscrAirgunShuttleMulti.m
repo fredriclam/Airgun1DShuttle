@@ -201,12 +201,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_closed(q);
                     elseif strcmpi('subsonic', ...
                             agState.portStates.caseKey)
-                        % Pressure boundary condition up
-%                         dq = dq + closure_r_out_sub(q, pTarget);
-%                         dq = dq + closure_r_out_sub_vel(q, ...
-%                             agState.portStates.velocityPort);
-                        % Solo pressure boundary condition
-%                         dq = dq + closure_r_out_sub(q, agState.portStates.p);
                         dq = dq + closure_r_out_sub(q, ...
                             agState.portStates.pPort);
                     elseif strcmpi('portChoked', ...
@@ -221,6 +215,12 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         else
                             warning('log supsonic outflow AND sonic port')
                         end
+                    elseif strcmpi('chamberChokedNatural', ...
+                        agState.portStates.caseKey)
+                        % Nothing to see here. Move along!
+                    elseif strcmpi('chamberChokedForced', ...
+                        agState.portStates.caseKey)
+                            error('Check me')
                     end
                 end
                 
