@@ -64,7 +64,7 @@ wPort = obj.schm.T(qPort) \ qPort;
 
 %% Define function in scope of fullState
 % Functions that handle boundary cases, capturing the local workspace
-function qPort = processSubsonicCase()
+function qPort = processSubsonicCase(qIn)
     % Note that entropy is lower in the outlet flow than in the bubble;
     % mixing, shocks, and turbulent dissipation causes a subsequent
     % entropy increase that is not explicitly modeled.
@@ -95,10 +95,10 @@ function qPort = processSubsonicCase()
 
     % Solve for viable q
     % TODO: prove uniqueness?
-    qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
 
-function qPort = processPortChokedCase()
+function qPort = processPortChokedCase(qIn)
     [MPort, exception]...
         = mapChokedPortAreaRatioToM(obj, APortExposed);
 
@@ -106,7 +106,33 @@ function qPort = processPortChokedCase()
     essentialConstraint = @(q) ...
             mapq2M(q) - MPort;
 
-    qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
+end
+
+function qPort = processChamberChokedCase(qIn)
+    % True mach condition M_R = 1
+    % This condition exists if the Euler domain feels it should be
+    % subsonic, but such a setup would result in a subsonic expansion
+    % into the bubble, where the sonic pressure is too high and the
+    % flow would have choked--precisely at the exit of the firing
+    % chamber. This makes sure M_R < 1 is invalid, and corrects the
+    % PDE. This boundary may or may not be represented in the final ode
+    % system solution, but has been encountered during ode solve.
+    essentialConstraint = @(q) ...
+            mapq2M(q) - 1;
+
+    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
+end
+
+function [qNew, iterateCount] = iterateToTol(callback, q, tol)
+    % Iterate a contraction mapping to tolerance in the norm
+    iterateCount = 1;
+    qNew = callback(q);
+    while norm(qNew-q) > tol && iterateCount < 100
+        q = qNew;
+        qNew = callback(q);
+        iterateCount = iterateCount + 1;
+    end
 end
 
 %% Compute boundary details
@@ -141,42 +167,40 @@ else
         qPort = q_R;
         % TODO: should be also a preservation BC
     else
-        if APortExposed > obj.physConst.crossSectionalArea % (expansion)
+        if APortExposed <= obj.physConst.crossSectionalArea % (contraction)
             if pSonic_R < pBubble
                 caseKey = 'subsonic';
-                qPort = processSubsonicCase();
+                % Explicit process (one-pass)
+                qPort = processSubsonicCase(q_R);
+            elseif M_R > 1
+                % Relax the numerics (required for a predictor step)
+                % Issue:
+                % M_R >> 1 for a step during a portClosed-portChoked only
+                % sequence.
             else 
                 caseKey = 'portChoked';
-                qPort = processPortChokedCase();
+                % Explicit process (one-pass)
+%                 qPort = processPortChokedCase(q_R);
+%                 assert(all( ...
+%                     norm(processPortChokedCase(q_R) - ...
+%                     processPortChokedCase(processPortChokedCase(q_R))) < 1e-4 ...
+%                 ));
+
+                % Iterative process
+                [qPort, ~] = iterateToTol(@processPortChokedCase, q_R, ...
+                    1e3*eps);
             end
-        else % APortExposed > obj.physConst.crossSectionalArea (contraction)
-            if obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
+        else % APortExposed > obj.physConst.crossSectionalArea (expansion)
+            if pSonic_R < pBubble % [pSonic_R < pBubble] insufficient pressure to choke at port
+                caseKey = 'subsonic';
+                qPort = processSubsonicCase(q_R);
+            elseif false %obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
                 caseKey = 'chamberChokedNatural';
                 qPort = q_R;
-%                 velocityPort = u_R;
-%                 pPort = p_R;
-%                 TPort = T_R;
-%                 rhoPort = pPort / obj.physConst.Q / TPort;
-%                 massFlowPort = rhoPort * velocityPort * obj.physConst.crossSectionalArea;
-            elseif false % MERGE CASE
+            else
                 caseKey = 'chamberChokedForced';
-                % True mach condition M_R = 1
-                % This condition exists if the Euler domain feels it should be
-                % subsonic, but such a setup would result in a subsonic expansion
-                % into the bubble, where the sonic pressure is too high and the
-                % flow would have choked--precisely at the exit of the firing
-                % chamber. This makes sure M_R < 1 is invalid, and corrects the
-                % PDE. This boundary may or may not be represented in the final ode
-                % system solution, but has been encountered during ode solve.
-
-                % Mach boundary condition at exit of PDE domain
-                essentialConstraint = @(q) ...
-                        mapq2M(q) - 1;
-
-                qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
-            else % [pSonic_R < pBubble] insufficient pressure to choke at port
-                caseKey = 'subsonic';
-                qPort = processSubsonicCase();
+                % Mach 1 boundary condition at exit of PDE domain
+                qPort = processChamberChokedCase(q_R);
             end
         end
     end
@@ -283,7 +307,7 @@ agState = struct(...
     'shuttleStates', shuttleStates, ...
     'noteString', noteString ...
 );
-% disp(caseKey);
+disp(caseKey);
     
 %     figure(103);
 %     bar(eulerDomainStates.characteristics_at_x_R)
