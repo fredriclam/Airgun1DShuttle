@@ -144,8 +144,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                        agState.eulerDomainStates.p_R > 0  && ...
                        agState.eulerDomainStates.c_R > 0);
                 assert(agState.portStates.rhoPort > 0);
-                assert(agState.portStates.APortExposed > 0 || ...
-                       agState.portStates.velocityPort == 0);
+%                 assert(agState.portStates.APortExposed > 0 || ...
+%                        agState.portStates.velocityPort == 0);
                     
                 % Check for inflow
                 if agState.eulerDomainStates.flowState ...
@@ -465,7 +465,10 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     'areaRatio', areaRatio ...
                 );
                 MUpstream = 0;
-                error(exception);
+                % Return soft exception and snap to area ratio = 1
+                % This allows temporary violation of the relation
+                areaRatio = 1;
+                MUpstream = obj.machAreaFunction(areaRatio);
             else
                 MUpstream = obj.machAreaFunction(areaRatio);
             end

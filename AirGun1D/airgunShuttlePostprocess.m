@@ -44,18 +44,62 @@ pS = [gridFullStates.portStates];
 portArea = [pS.APortExposed];
 csArea = metadata.discretization.physConst.crossSectionalArea;
 
-%
-pRatio = p_RHistory ./ pSonic_RHistory;
+bS = [gridFullStates.bubbleStates];
+pBubbleHistory = [bS.p];
+
+pRatio = pSonic_RHistory ./ pBubbleHistory ;
 ARatio = portArea / csArea;
+
+caseKeyHistory = cellfun(@(k) caseKey2Num(k), {pS.caseKey});
 
 figure(1); clf;
 subplot(1,2,1);
-plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
-text(pRatio(1),0.05,'Start')
-hold on
-plot(pRatio, ARatio, 'k', 'LineWidth', 1)
-hold off
-xlabel ('$p_\mathrm{R}/p_\mathrm{R}^*$', 'Interpreter', 'latex', 'FontSize', 18)
+
+if false
+    % Plain color plot
+    plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
+    text(pRatio(1),0.05,'Start')
+    hold on
+    plot(pRatio, ARatio, 'k', 'LineWidth', 1)
+    hold off
+else
+    % Color coded plot
+    
+    
+    
+    % Find all case key switches
+    caseKeySwitchIndices = [0, find(...
+        caseKeyHistory(2:end) ~= caseKeyHistory(1:end-1),...
+        length(caseKeyHistory)-1)];
+    
+    colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
+    % Dummy lines for legend
+    for i = 1:5
+        plot(pRatio(1), ARatio(1), [colorMap{i}, '-'])
+        hold on
+    end
+    
+    for i = 1:length(caseKeySwitchIndices)-1
+        % Include the right boundary element too for continuity
+        plotRange = caseKeySwitchIndices(i)+1:caseKeySwitchIndices(i+1)+1;
+        plot(pRatio(plotRange), ARatio(plotRange), ...
+            [colorMap{1+caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
+        hold on
+    end
+    
+    plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
+    text(pRatio(1),0.05,'Start')
+    hold off
+    
+    legendLabels = {'Closed', ...
+        'Subsonic', ...
+        'Port choked', ...
+        'Chamber choked', ...
+        'Chamber choked*'};
+    legend(legendLabels, 'Interpreter', 'latex')
+end
+
+xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
 set(gca, ...
     'FontSize', 14, ...
@@ -93,7 +137,7 @@ set(gcf, 'position', ...
 %% Figure 2-4: Wing plots
 figure(2); clf;
 plot(pRatio, solution.soln.x, 'k', 'LineWidth', 1)
-xlabel ('$p_\mathrm{R}/p_\mathrm{R}^*$', 'Interpreter', 'latex', 'FontSize', 18)
+xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
 set(gca, ...
     'FontSize', 14, ...

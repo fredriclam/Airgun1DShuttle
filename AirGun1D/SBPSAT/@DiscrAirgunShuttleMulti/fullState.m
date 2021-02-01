@@ -62,7 +62,54 @@ qPort = q_R;
 % Compute port characteristic variable values
 wPort = obj.schm.T(qPort) \ qPort;
 
-% Compute geometry
+%% Define function in scope of fullState
+% Functions that handle boundary cases, capturing the local workspace
+function qPort = processSubsonicCase()
+    % Note that entropy is lower in the outlet flow than in the bubble;
+    % mixing, shocks, and turbulent dissipation causes a subsequent
+    % entropy increase that is not explicitly modeled.
+    % Thus s_R <= sPort <= sBubble
+
+    %% Check entropy (exponential-entropy)
+    entropyFn = @(p, rho) p / rho^obj.physConst.gamma;
+    if entropyFn(p_R, rho_R) >= entropyFn(pBubble, rhoBubble)
+        error('Entropy decreased from port to bubble.')
+    end
+
+    %% Build the function for "Mach number consistent with
+    % downstream pressure continuity"
+    % Map from q to mach at the port
+    machExitFn = @(q) machPressureFunction(obj.physConst.gamma, ...
+          pBubble/pStagnationFn(q));
+    % Composed map: q -> mach at the port -> A_port/A* -> A_cs/A* ->
+    %   M_upstream
+    MPortFn = @(q) obj.machAreaFunction(...
+        obj.physConst.crossSectionalArea / ...
+        APortExposed * areaMachFunction(obj.physConst.gamma, ...
+        machExitFn(q)));
+
+    % Constraint: mach computed from q is equal to the mach computed
+    % from steady-state flow terminating in pressure continuity at the
+    % port
+    essentialConstraint = @(q) machFn(q) - MPortFn(q);
+
+    % Solve for viable q
+    % TODO: prove uniqueness?
+    qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+end
+
+function qPort = processPortChokedCase()
+    [MPort, exception]...
+        = mapChokedPortAreaRatioToM(obj, APortExposed);
+
+    % Mach boundary condition at exit of PDE domain
+    essentialConstraint = @(q) ...
+            mapq2M(q) - MPort;
+
+    qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+end
+
+%% Compute boundary details
 if REVERT_MODEL
     caseKey = 'noShuttle';
     % Fix outlet area to equal the cross-sectional area
@@ -87,138 +134,67 @@ else
     
     % Case dependent boundary values
     if APortExposed == 0 % Case 0A: port is closed
+        % This case is final. No negotiation if the port is closed!
         caseKey = 'portClosed'; % Port is closed
         massFlowPort = 0;
         velocityPort = 0;
-        pPort = p_R;
-        TPort = T_R;
-        rhoPort = pPort / obj.physConst.Q / TPort;
-    elseif obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW
-                                     % Case 0B: natural (super)sonic outflow
-        caseKey = 'chamberChokedNatural';
-        
-        velocityPort = u_R;
-        pPort = p_R;
-        TPort = T_R;
-        rhoPort = pPort / obj.physConst.Q / TPort;
-        massFlowPort = rhoPort * velocityPort * obj.physConst.crossSectionalArea;
-    elseif pSonic_R < pBubble % Case 1: insufficient pressure to choke at port
-        caseKey = 'subsonic';
-        
-        % Note that entropy is lower in the outlet flow than in the bubble;
-        % mixing, shocks, and turbulent dissipation causes a subsequent
-        % entropy increase that is not explicitly modeled.
-        
-        % Check entropy
-        entropy = @(p, rho) p / rho^obj.physConst.gamma;
-        if entropy(p_R, rho_R) > entropy(pBubble, rhoBubble)
-            error('Entropy decreased from port to bubble.')
+        qPort = q_R;
+        % TODO: should be also a preservation BC
+    else
+        if APortExposed > obj.physConst.crossSectionalArea % (expansion)
+            if pSonic_R < pBubble
+                caseKey = 'subsonic';
+                qPort = processSubsonicCase();
+            else 
+                caseKey = 'portChoked';
+                qPort = processPortChokedCase();
+            end
+        else % APortExposed > obj.physConst.crossSectionalArea (contraction)
+            if obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
+                caseKey = 'chamberChokedNatural';
+                qPort = q_R;
+%                 velocityPort = u_R;
+%                 pPort = p_R;
+%                 TPort = T_R;
+%                 rhoPort = pPort / obj.physConst.Q / TPort;
+%                 massFlowPort = rhoPort * velocityPort * obj.physConst.crossSectionalArea;
+            elseif false % MERGE CASE
+                caseKey = 'chamberChokedForced';
+                % True mach condition M_R = 1
+                % This condition exists if the Euler domain feels it should be
+                % subsonic, but such a setup would result in a subsonic expansion
+                % into the bubble, where the sonic pressure is too high and the
+                % flow would have choked--precisely at the exit of the firing
+                % chamber. This makes sure M_R < 1 is invalid, and corrects the
+                % PDE. This boundary may or may not be represented in the final ode
+                % system solution, but has been encountered during ode solve.
+
+                % Mach boundary condition at exit of PDE domain
+                essentialConstraint = @(q) ...
+                        mapq2M(q) - 1;
+
+                qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+            else % [pSonic_R < pBubble] insufficient pressure to choke at port
+                caseKey = 'subsonic';
+                qPort = processSubsonicCase();
+            end
         end
-        % Set q port according to back-pressure condition
-                
-        %% Build the function for "Mach number consistent with
-        % downstream pressure continuity"
-        % Map from q to mach at the port
-        machExitFn = @(q) machPressureFunction(obj.physConst.gamma, ...
-              pBubble/pStagnationFn(q));
-        % Composed map: q -> mach at the port -> A_port/A* -> A_cs/A* ->
-        %   M_upstream
-        MPortFn = @(q) obj.machAreaFunction(...
-            obj.physConst.crossSectionalArea / ...
-            APortExposed * areaMachFunction(obj.physConst.gamma, ...
-            machExitFn(q)));
-        
-        % Constraint: mach computed from q is equal to the mach computed
-        % from steady-state flow terminating in pressure continuity at the
-        % port
-        essentialConstraint = @(q) machFn(q) - MPortFn(q);
-        
-        % Solve for viable q
-        % TODO: prove uniqueness (or not)
-        qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
-        
-        rhoPort = qPort(1);
-        velocityPort = qPort(2) / qPort(1);
-        eTotalPort = qPort(3);
-        TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
-            obj.physConst.c_v;
-        pPort = obj.schm.p(qPort);
-        cPort = obj.schm.c(qPort);
-        MPort = velocityPort / cPort;
-        massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
-        wPort = mapq2characteristics(qPort);
-        
-%         % Define upstream pressure
-%         pUpstream = @(pDownstream, rhoDownstream, rhoUpstream) ...
-%           pDownstream * (rhoUpstream / rhoDownstream)^obj.physConst.gamma;
-%         pPort = pUpstream(pBubble, rhoBubble, rhoPort);
-%         % Compute upstream mach from pressure
-%         try
-%             MPort = machPressureFunction(obj.physConst.gamma, pPort/p0_R);
-%         catch
-%             caseKey = 'subsonicForcingSonic';
-%             
-%             MPort = 1;
-%         end
-%         velocityPort = MPort * c_R;
-%         massFlowPort = rho_R * velocityPort * ...
-%             obj.physConst.crossSectionalArea;
-    elseif APortExposed <= obj.physConst.crossSectionalArea
-        caseKey = 'portChoked';
-        [MPort, exception]...
-            = mapChokedPortAreaRatioToM(obj, APortExposed);
-        
-        % Mach boundary condition at exit of PDE domain
-        essentialConstraint = @(q) ...
-                mapq2M(q) - MPort;
-        
-        qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
-        
-        %% Compute primitives
-        pPort = obj.schm.p(qPort);
-        velocityPort = qPort(2)/qPort(1);
-        rhoPort = qPort(1);
-        eTotalPort = qPort(3);
-        TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
-            obj.physConst.c_v;
-        cPort = sqrt(obj.physConst.gamma * obj.physConst.Q * TPort);
-        MPort = velocityPort / cPort;
-        massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
-        wPort = mapq2characteristics(qPort);
-    elseif APortExposed > obj.physConst.crossSectionalArea
-        caseKey = 'chamberChokedForced';
-        % True mach condition M_R = 1
-        % This condition exists if the Euler domain feels it should be
-        % subsonic, but such a setup would result in a subsonic expansion
-        % into the bubble, where the sonic pressure is too high and the
-        % flow would have choked--precisely at the exit of the firing
-        % chamber. This makes sure M_R < 1 is invalid, and corrects the
-        % PDE. This boundary may or may not be represented in the final ode
-        % system solution, but has been encountered during ode solve.
-        
-        % Mach boundary condition at exit of PDE domain
-        essentialConstraint = @(q) ...
-                mapq2M(q) - 1;
-        
-        qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
-        %% Compute primitives
-        pPort = obj.schm.p(qPort);
-        velocityPort = qPort(2)/qPort(1);
-        rhoPort = qPort(1);
-        eTotalPort = qPort(3);
-        TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
-            obj.physConst.c_v;
-        cPort = sqrt(obj.physConst.gamma * obj.physConst.Q * TPort);
-        MPort = velocityPort / cPort;
-        massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
-        wPort = mapq2characteristics(qPort);
     end
     
-    % Compute port total energy per unit volume
-    eTotalPort = rhoPort * obj.physConst.c_v * TPort ...
-        + 0.5 * rhoPort * velocityPort^2;
+    % Compute primitives
+    rhoPort = qPort(1);
+    velocityPort = qPort(2) / qPort(1);
+    eTotalPort = qPort(3);
+    TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
+        obj.physConst.c_v;
+    pPort = obj.schm.p(qPort);
+    cPort = obj.schm.c(qPort);
+    MPort = velocityPort / cPort;
+    massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
+    wPort = mapq2characteristics(qPort);
 end
 
+%% Post-process state
 % Compute port sound speed
 cPort = sqrt(obj.physConst.gamma * obj.physConst.Q * TPort);
 
