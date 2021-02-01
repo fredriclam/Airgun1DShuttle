@@ -20,7 +20,7 @@ function [solution, metadata, solShuttleFree] = ...
                             runShuttleFreeFlag,metadata)
     %% Defaults for this function
     % Plot every [s]
-    PLOT_INTERVAL = 0*1e-4;
+    PLOT_INTERVAL = 1e-2;
     REL_TOL = 1e-4;
                         
     %% User checking and unpacking input parameters

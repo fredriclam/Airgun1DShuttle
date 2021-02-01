@@ -7,8 +7,9 @@ function [agState, exception] = ...
 % post-processing.
 
 exception = [];
-INCLUDE_ALL_PRIMITIVES = true;
-USE_LEGACY_ENFORCEMENT = false;
+% Disable to improve speed; enable to debug Euler domain states
+INCLUDE_ALL_PRIMITIVES = false;
+
 
 %% Compute primitive variables at right of PDE domain
 q_R = obj.schm.e_R'*q;
@@ -17,7 +18,7 @@ u_R = q_R(2)/q_R(1);
 rho_R = q_R(1);
 e_tot_R = q_R(3);
 T_R = (e_tot_R - 0.5 * rho_R * u_R^2) / rho_R / obj.physConst.c_v;
-c_R = sqrt(obj.physConst.gamma * obj.physConst.Q * T_R);
+c_R = obj.schm.c(q_R);
 M_R = u_R / c_R;
 
 %% Compute isentropic flow quantities
@@ -186,13 +187,31 @@ else
         wPort = mapq2characteristics(qPort);
     elseif APortExposed > obj.physConst.crossSectionalArea
         caseKey = 'chamberChokedForced';
-        % TODO: Replace with properly enforced Mach condition
-        MPort = 1;
-        velocityPort = MPort * c_R;
-        massFlowPort = velocityPort * rho_R * obj.physConst.crossSectionalArea;
-        rhoPort = rho_R;
-        pPort = p_R;
-        TPort = T_R;
+        % True mach condition M_R = 1
+        % This condition exists if the Euler domain feels it should be
+        % subsonic, but such a setup would result in a subsonic expansion
+        % into the bubble, where the sonic pressure is too high and the
+        % flow would have choked--precisely at the exit of the firing
+        % chamber. This makes sure M_R < 1 is invalid, and corrects the
+        % PDE. This boundary may or may not be represented in the final ode
+        % system solution, but has been encountered during ode solve.
+        
+        % Mach boundary condition at exit of PDE domain
+        essentialConstraint = @(q) ...
+                mapq2M(q) - 1;
+        
+        qPort = obj.enforceScalarConstraint(essentialConstraint, q_R);
+        %% Compute primitives
+        pPort = obj.schm.p(qPort);
+        velocityPort = qPort(2)/qPort(1);
+        rhoPort = qPort(1);
+        eTotalPort = qPort(3);
+        TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
+            obj.physConst.c_v;
+        cPort = sqrt(obj.physConst.gamma * obj.physConst.Q * TPort);
+        MPort = velocityPort / cPort;
+        massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
+        wPort = mapq2characteristics(qPort);
     end
     
     % Compute port total energy per unit volume
@@ -288,7 +307,7 @@ agState = struct(...
     'shuttleStates', shuttleStates, ...
     'noteString', noteString ...
 );
-disp(caseKey);
+% disp(caseKey);
     
 %     figure(103);
 %     bar(eulerDomainStates.characteristics_at_x_R)

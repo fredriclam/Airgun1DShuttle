@@ -15,7 +15,7 @@ addpath ..\sbplib
 % Simulation window [s]
 % Suggested values:
 % 0.100 to 0.600 s
-tspan = [0; 0.010];
+tspan = [0; 0.220];
 % Set flag for running shuttle-free model
 runShuttleFreeFlag = false;
 
