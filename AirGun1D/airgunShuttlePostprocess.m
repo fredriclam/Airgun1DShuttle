@@ -64,9 +64,6 @@ if false
     hold off
 else
     % Color coded plot
-    
-    
-    
     % Find all case key switches
     caseKeySwitchIndices = [0, find(...
         caseKeyHistory(2:end) ~= caseKeyHistory(1:end-1),...
@@ -74,7 +71,7 @@ else
     
     colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
     % Dummy lines for legend
-    for i = 1:5
+    for i = 1:6
         plot(pRatio(1), ARatio(1), [colorMap{i}, '-'])
         hold on
     end
@@ -95,7 +92,8 @@ else
         'Subsonic', ...
         'Port choked', ...
         'Chamber choked', ...
-        'Chamber choked*'};
+        'Chamber choked*', ...
+        'Relaxation'};
     legend(legendLabels, 'Interpreter', 'latex')
 end
 
@@ -192,7 +190,7 @@ caseKeyHistory = cellfun(@(k) caseKey2Num(k), {pS.caseKey});
 plot(solution.soln.x, caseKeyHistory, 'k', 'LineWidth', 1)
 
 xlabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
-ylim([-0.5, 4.5])
+ylim([-0.5, 5.5])
 set(gca, ...
     'FontSize', 14, ...
     'TickLabelInterpreter', 'latex', ...
@@ -206,9 +204,10 @@ labels = {
     'Subsonic', ...
     'Port choked', ...
     'Chamber choked', ...
-    'Chamber choked*'
+    'Chamber choked*', ...
+    'Relaxation' ...
 };
-set(gca, 'YTick', 0:4, 'YTickLabel', labels)
+set(gca, 'YTick', 0:5, 'YTickLabel', labels)
 
 %% Explicit [deprecated]
 % Extract states manually
@@ -238,6 +237,8 @@ function caseNum = caseKey2Num(caseKey)
         caseNum = 3;
     elseif strcmpi('chamberChokedForced', caseKey)
         caseNum = 4;
+    elseif strcmpi('relaxation', caseKey)
+        caseNum = 5;
     else
         caseNum = NaN;
     end

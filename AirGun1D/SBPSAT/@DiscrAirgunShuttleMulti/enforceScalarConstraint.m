@@ -1,4 +1,4 @@
-function qTarget = enforceScalarConstraint(obj, essentialConstraint, q_R)
+function [qTarget, exitFlag] = enforceScalarConstraint(obj, essentialConstraint, q_R)
 % q_R: 3-element vector of the existing state
 % essentialConstraint: function handle for the physical constraint
 
@@ -60,14 +60,33 @@ qConstrained = @(deviationScalar) q_R + deviationScalar*nullVector;
 % 1-D solve for target state that satisfies the essential constraint
 [deviationScalar, ~, exitFlag] = ...
     fzero(@(deviationScalar) ...
-          essentialConstraint(qConstrained(deviationScalar)), 0);
+          essentialConstraint(qConstrained(deviationScalar)), ...
+          0, ...
+          optimset('Display','none'));
+
+if exitFlag == -4
+    try
+    % Complex fallback
+    [deviationScalar, ~, exitFlag] = ...
+    fzero(@(deviationScalar) ...
+          essentialConstraint(qConstrained(deviationScalar)), ...
+          [-1e10, 1e10], ...
+          optimset('Display','none'));
+    catch
+        % Persist exit flag
+        exitFlag = -4;
+    end
+end
       
 % Compute target state
 qTarget = q_R + deviationScalar * nullVector;                  
 
 % fsolve error checking
 if exitFlag ~=1 && exitFlag ~= 2
-    warning('Possible problem solving system. Help!')
+%     warning('Possible problem solving system. Help!')
+4;
 end
+
+
 
 end

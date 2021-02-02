@@ -201,8 +201,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_closed(q);
                     elseif strcmpi('subsonic', ...
                             agState.portStates.caseKey)
-                        dq = dq + closure_r_out_sub(q, ...
-                            agState.portStates.pPort);
+                        dq = dq + closure_r_char(q, ...
+                            agState.portStates.wPort);
                     elseif strcmpi('portChoked', ...
                             agState.portStates.caseKey)
                         if agState.portStates.velocityPort <= 0
@@ -264,7 +264,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
         agState = fullState(obj, q, t, bubble, shuttle, REVERT_MODEL)
         
         % Declare constraint enforcement function
-        qTarget = enforceScalarConstraint(obj, essentialConstraint, q_R)
+        [qTarget, exitFlag] = enforceScalarConstraint(obj, essentialConstraint, q_R)
         
         function pStar = sonicPressure(obj, pressure, M)
             % Compute sonic pressure at given state

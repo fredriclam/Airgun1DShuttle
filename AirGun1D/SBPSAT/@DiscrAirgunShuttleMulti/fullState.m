@@ -6,6 +6,8 @@ function [agState, exception] = ...
 % Use within RHS function for ODE and for querying state in
 % post-processing.
 
+% TODO: track #evals of each case
+
 exception = [];
 % Disable to improve speed; enable to debug Euler domain states
 INCLUDE_ALL_PRIMITIVES = false;
@@ -64,7 +66,7 @@ wPort = obj.schm.T(qPort) \ qPort;
 
 %% Define function in scope of fullState
 % Functions that handle boundary cases, capturing the local workspace
-function qPort = processSubsonicCase(qIn)
+function [qPort, exitFlag] = processSubsonicCase(qIn)
     % Note that entropy is lower in the outlet flow than in the bubble;
     % mixing, shocks, and turbulent dissipation causes a subsequent
     % entropy increase that is not explicitly modeled.
@@ -95,10 +97,11 @@ function qPort = processSubsonicCase(qIn)
 
     % Solve for viable q
     % TODO: prove uniqueness?
-    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
+    [qPort, exitFlag] = ...
+        obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
 
-function qPort = processPortChokedCase(qIn)
+function [qPort, exitFlag] = processPortChokedCase(qIn)
     [MPort, exception]...
         = mapChokedPortAreaRatioToM(obj, APortExposed);
 
@@ -106,10 +109,11 @@ function qPort = processPortChokedCase(qIn)
     essentialConstraint = @(q) ...
             mapq2M(q) - MPort;
 
-    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
+    [qPort, exitFlag] = ...
+        obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
 
-function qPort = processChamberChokedCase(qIn)
+function [qPort, exitFlag] = processChamberChokedCase(qIn)
     % True mach condition M_R = 1
     % This condition exists if the Euler domain feels it should be
     % subsonic, but such a setup would result in a subsonic expansion
@@ -121,16 +125,24 @@ function qPort = processChamberChokedCase(qIn)
     essentialConstraint = @(q) ...
             mapq2M(q) - 1;
 
-    qPort = obj.enforceScalarConstraint(essentialConstraint, qIn);
+    [qPort, exitFlag] = ...
+        obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
 
-function [qNew, iterateCount] = iterateToTol(callback, q, tol)
+function [qNew, exitFlag, iterateCount] = iterateToTol(callback, q, tol)
     % Iterate a contraction mapping to tolerance in the norm
     iterateCount = 1;
-    qNew = callback(q);
+    [qNew, exitFlag] = callback(q);
+    if exitFlag ~= 1
+        return
+    end
+    
     while norm(qNew-q) > tol && iterateCount < 100
         q = qNew;
-        qNew = callback(q);
+        [qNew, exitFlag] = callback(q);
+        if exitFlag ~= 1
+            return
+        end
         iterateCount = iterateCount + 1;
     end
 end
@@ -170,32 +182,87 @@ else
         if APortExposed <= obj.physConst.crossSectionalArea % (contraction)
             if pSonic_R < pBubble
                 caseKey = 'subsonic';
-                % Explicit process (one-pass)
-                qPort = processSubsonicCase(q_R);
-            elseif M_R > 1
-                % Relax the numerics (required for a predictor step)
-                % Issue:
-                % M_R >> 1 for a step during a portClosed-portChoked only
-                % sequence.
+                qPort = iterateToTol(...
+                    @processSubsonicCase, ...
+                    q_R, ...
+                    1e3*eps);
             else 
                 caseKey = 'portChoked';
-                % Explicit process (one-pass)
-%                 qPort = processPortChokedCase(q_R);
-%                 assert(all( ...
-%                     norm(processPortChokedCase(q_R) - ...
-%                     processPortChokedCase(processPortChokedCase(q_R))) < 1e-4 ...
-%                 ));
-
-                % Iterative process
-                [qPort, ~] = iterateToTol(@processPortChokedCase, q_R, ...
+                % TODO: Log
+                [qPort, exitFlag, ~] = iterateToTol(...
+                    @processPortChokedCase, ...
+                    q_R, ...
                     1e3*eps);
+                if exitFlag ~= 1 || ...
+                        qPort(3) < 0 || ...
+                        ~(obj.schm.c(qPort) > 0) || ...
+                        ~(obj.schm.p(qPort) > 0)
+                    % Relax the numerics (required for a predictor step)
+                    % Issue:
+                    % M_R >> 1 for a step during a portClosed-portChoked only
+                    % sequence. See commit [wip 4b534a7].
+                    % Fallback case when M_R is too far away from
+                    % subsonic.
+                    caseKey = 'relaxation';
+                    qPort = q_R;
+                end
             end
+            
+            caseKeyOld = "";
+            % Reiteration
+            reiterationCount = 1;
+            while ~strcmpi(caseKeyOld, caseKey)
+                caseKeyOld = caseKey;
+                pSonicNew = pStagnationFn(qPort) * ...
+                    (machFactor(1))^(-obj.physConst.gamma/(obj.physConst.gamma-1));
+                if pSonicNew < pBubble
+                    caseKey = 'subsonic';
+                    % Explicit process (one-pass)
+                    qPort = iterateToTol(...
+                        @processSubsonicCase, ...
+                        qPort, ...
+                        1e3*eps);
+                else 
+                    caseKey = 'portChoked';
+                    % TODO: Log
+                    [qPort, exitFlag, ~] = iterateToTol(...
+                        @processPortChokedCase, ...
+                        qPort, ...
+                        1e3*eps);
+                    if exitFlag ~= 1 || ...
+                            qPort(3) < 0 || ...
+                            ~(obj.schm.c(qPort) > 0) || ...
+                            ~(obj.schm.p(qPort) > 0)
+                        % Relax the numerics (required for a predictor step)
+                        % Issue:
+                        % M_R >> 1 for a step during a portClosed-portChoked only
+                        % sequence. See commit [wip 4b534a7].
+                        % Fallback case when M_R is too far away from
+                        % subsonic.
+                        caseKey = 'relaxation';
+                        qPort = q_R;
+                    end
+                end
+                reiterationCount = reiterationCount + 1;
+                
+                if reiterationCount > 100
+                    error('Cant decide which case this is. Help!')
+                end
+            end
+            
         else % APortExposed > obj.physConst.crossSectionalArea (expansion)
             if pSonic_R < pBubble % [pSonic_R < pBubble] insufficient pressure to choke at port
                 caseKey = 'subsonic';
                 qPort = processSubsonicCase(q_R);
-            elseif false %obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
+            elseif M_R > 1
+                % Should be consistent with pSonic_R >= pBubble
                 caseKey = 'chamberChokedNatural';
+                % Relax the numerics (required for a predictor step)
+                % Issue:
+                % M_R >> 1 for a step during a portClosed-portChoked only
+                % sequence. See commit [wip 4b534a7].
+                qPort = q_R;
+            elseif false %obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
                 qPort = q_R;
             else
                 caseKey = 'chamberChokedForced';
@@ -307,7 +374,7 @@ agState = struct(...
     'shuttleStates', shuttleStates, ...
     'noteString', noteString ...
 );
-disp(caseKey);
+% disp(caseKey);
     
 %     figure(103);
 %     bar(eulerDomainStates.characteristics_at_x_R)
