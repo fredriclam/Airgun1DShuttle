@@ -170,6 +170,17 @@ else
         (shuttle(1) - obj.physConst.portLead) / ...
         (obj.physConst.operatingChamberLength - obj.physConst.portLead)]);
     
+    % Treat M_R as <= 1
+    if M_R > 1
+        [q_RMod, exitFlag] = iterateToTol(...
+            @processChamberChokedCase, ...
+            q_R, ...
+            1e3*eps);
+        if exitFlag == 1
+            q_R = q_RMod;
+        end
+    end
+    
     % Case dependent boundary values
     if APortExposed == 0 % Case 0A: port is closed
         % This case is final. No negotiation if the port is closed!

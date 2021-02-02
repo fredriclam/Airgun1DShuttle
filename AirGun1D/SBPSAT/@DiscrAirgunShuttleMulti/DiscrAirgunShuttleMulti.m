@@ -201,6 +201,13 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_closed(q);
                     elseif strcmpi('subsonic', ...
                             agState.portStates.caseKey)
+                        % Characteristic enforcement for subsonic
+                        % Issue: 
+                        % Need to use characteristic enforcement to get
+                        % subsonic when caseKey='subsonic' properly.
+                        % See github commit [wip a80282b], the first time
+                        % the characteristic closure is used for the
+                        % subsonic, and compare to using pPort instead.
                         dq = dq + closure_r_char(q, ...
                             agState.portStates.wPort);
                     elseif strcmpi('portChoked', ...
@@ -220,7 +227,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         % Nothing to see here. Move along!
                     elseif strcmpi('chamberChokedForced', ...
                         agState.portStates.caseKey)
-                            dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+%                             dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
+                            dq = dq + closure_r_char(q, agState.portStates.wPort);
                     end
                 end
                 
