@@ -216,18 +216,13 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                             warning('port choked back flow')
                             dq = dq + closure_r_closed(q);
                         end
-                        
                         if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
                             dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
                         else
                             warning('log supsonic outflow AND sonic port')
                         end
-                    elseif strcmpi('chamberChokedNatural', ...
-                        agState.portStates.caseKey)
-                        % Nothing to see here. Move along!
                     elseif strcmpi('chamberChokedForced', ...
                         agState.portStates.caseKey)
-%                             dq = dq + closure_r_out_sub_vel(q, agState.portStates.velocityPort);
                             dq = dq + closure_r_char(q, agState.portStates.wPort);
                     end
                 end

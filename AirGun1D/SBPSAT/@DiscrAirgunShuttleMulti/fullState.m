@@ -208,12 +208,14 @@ else
                         qPort(3) < 0 || ...
                         ~(obj.schm.c(qPort) > 0) || ...
                         ~(obj.schm.p(qPort) > 0)
-                    % Relax the numerics (required for a predictor step)
+                    % Relax the numerics (required for predictor steps
+                    % sometimes)
                     % Issue:
                     % M_R >> 1 for a step during a portClosed-portChoked only
                     % sequence. See commit [wip 4b534a7].
                     % Fallback case when M_R is too far away from
-                    % subsonic.
+                    % subsonic, and we fail to find a q such that M(q) = 1
+                    % while preserving the outgoing characteristics.
                     caseKey = 'relaxation';
                     qPort = q_R;
                 end
@@ -265,16 +267,6 @@ else
             if pSonic_R < pBubble % [pSonic_R < pBubble] insufficient pressure to choke at port
                 caseKey = 'subsonic';
                 qPort = processSubsonicCase(q_R);
-            elseif M_R > 1
-                % Should be consistent with pSonic_R >= pBubble
-                caseKey = 'chamberChokedNatural';
-                % Relax the numerics (required for a predictor step)
-                % Issue:
-                % M_R >> 1 for a step during a portClosed-portChoked only
-                % sequence. See commit [wip 4b534a7].
-                qPort = q_R;
-            elseif false %obj.schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW % TODO replace with \hat{M} conditions
-                qPort = q_R;
             else
                 caseKey = 'chamberChokedForced';
                 % Mach 1 boundary condition at exit of PDE domain
