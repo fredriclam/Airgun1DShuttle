@@ -12,7 +12,10 @@ exception = [];
 % Disable to improve speed; enable to debug Euler domain states
 INCLUDE_ALL_PRIMITIVES = false;
 
-iterativeSolveTol = 1e3*eps;
+% Tolerance for iterateToTol
+iterativeSolveTol = 1e-8;
+% Max number of iterations allowed for iterateToTol
+iterateToTolMaxIterations = 100;
 
 %% Compute primitive variables at right of PDE domain
 q_R = obj.schm.e_R'*q;
@@ -62,11 +65,8 @@ mapq2characteristics = @(q) obj.schm.T(q) \ q;
 %% Create empty note string
 noteString = "";
 
-% TEMP TODO: replace. This is a default value 
-qPort = q_R;
-% TEMP TODO: default
-% Compute port characteristic variable values
-wPort = obj.schm.T(qPort) \ qPort;
+% % Default value
+% qPort = q_R;
 
 %% Define function in scope of fullState
 % Functions that handle boundary cases, capturing the local workspace
@@ -76,13 +76,13 @@ function [qPort, exitFlag] = processSubsonicCase(qIn)
     % entropy increase that is not explicitly modeled.
     % Thus s_R <= sPort <= sBubble
 
-    %% Check entropy (exponential-entropy)
+    % Check entropy (exponential-entropy)
     entropyFn = @(p, rho) p / rho^obj.physConst.gamma;
     if entropyFn(p_R, rho_R) >= entropyFn(pBubble, rhoBubble)
         error('Entropy decreased from port to bubble.')
     end
 
-    %% Build the function for "Mach number consistent with
+    % Build the function for "Mach number consistent with
     % downstream pressure continuity"
     % Map from q to mach at the port
     machExitFn = @(q) machPressureFunction(obj.physConst.gamma, ...
@@ -141,7 +141,7 @@ function [qNew, exitFlag, iterateCount] = iterateToTol(callback, q, tol)
         return
     end
     
-    while norm(qNew-q) > tol && iterateCount < 100
+    while norm(qNew-q) > tol && iterateCount < iterateToTolMaxIterations
         q = qNew;
         [qNew, exitFlag] = callback(q);
         if exitFlag ~= 1
@@ -149,22 +149,61 @@ function [qNew, exitFlag, iterateCount] = iterateToTol(callback, q, tol)
         end
         iterateCount = iterateCount + 1;
     end
+    
+%     if iterateCount >= iterateToTolMaxIterations
+%         warning('Iteration count reached in BC inner loop')
+%     end
 end
 
-% Try cases for contraction flow
+% Select subsonic or sonic case for contraction flow (cross section area >
+% port area).
 function [qOut, caseKeyOut] = tryCasesContraction(qIn)
 if pSonicFn(qIn) < pBubble
     caseKeyOut = 'subsonic';
     qOut = iterateToTol(...
         @processSubsonicCase, ...
         qIn, ...
-        1e3*eps);
+        iterativeSolveTol);
 else
     caseKeyOut = 'portChoked';
-    [qOut, exitFlag, iterateCount] = iterateToTol(...
+    [qOut, exitFlag, ~] = iterateToTol(...
         @processPortChokedCase, ...
         qIn, ...
-        1e3*eps);
+        iterativeSolveTol);
+    if exitFlag ~= 1 || ...
+            qOut(3) < 0 || ...
+            ~(obj.schm.c(qOut) > 0) || ...
+            ~(obj.schm.p(qOut) > 0)
+        % Relax the numerics (required for predictor steps
+        % sometimes)
+        % Issue:
+        % M_R >> 1 for a step during a portClosed-portChoked only
+        % sequence. See commit [wip 4b534a7].
+        % Fallback case when M_R is too far away from
+        % subsonic, and we fail to find a q such that M(q) = 1
+        % while preserving the outgoing characteristics.
+        caseKeyOut = 'relaxation';
+        qOut = qIn;
+    end
+end
+end
+
+% Select subsonic or sonic case for expansion flow (cross section area >
+% port area).
+function [qOut, caseKeyOut] = tryCasesExpansion(qIn)
+if pSonicFn(qIn) < pBubble
+    caseKeyOut = 'subsonic';
+    qOut = iterateToTol(...
+        @processSubsonicCase, ...
+        qIn, ...
+        iterativeSolveTol);
+else
+    caseKeyOut = 'chamberChokedForced';
+    % Mach-1 boundary condition at exit of PDE domain
+    [qOut, exitFlag, ~] = iterateToTol(...
+        @processChamberChokedCase, ...
+        qIn, ...
+        iterativeSolveTol);
     if exitFlag ~= 1 || ...
             qOut(3) < 0 || ...
             ~(obj.schm.c(qOut) > 0) || ...
@@ -227,58 +266,40 @@ else
         qPort = q_R;
     else
         if APortExposed <= obj.physConst.crossSectionalArea % (contraction)
+            % Select sonic or subsonic treatment based on q_R
             [qPort, caseKey] = tryCasesContraction(q_R);
             
             caseKeyOld = '';
-            % Reiteration
+            % Outer iteration loop: until the boundary case stabilizes
             reiterationCount = 1;
             while ~strcmpi(caseKeyOld, caseKey)
+                % Swap data
                 caseKeyOld = caseKey;
-                pSonicNew = pStagnationFn(qPort) * ...
-                    (machFactor(1))^(-obj.physConst.gamma/(obj.physConst.gamma-1));
-                if pSonicNew < pBubble
-                    caseKey = 'subsonic';
-                    % Explicit process (one-pass)
-                    qPort = iterateToTol(...
-                        @processSubsonicCase, ...
-                        qPort, ...
-                        1e3*eps);
-                else 
-                    caseKey = 'portChoked';
-                    % TODO: Log
-                    [qPort, exitFlag, ~] = iterateToTol(...
-                        @processPortChokedCase, ...
-                        qPort, ...
-                        1e3*eps);
-                    if exitFlag ~= 1 || ...
-                            qPort(3) < 0 || ...
-                            ~(obj.schm.c(qPort) > 0) || ...
-                            ~(obj.schm.p(qPort) > 0)
-                        % Relax the numerics (required for a predictor step)
-                        % Issue:
-                        % M_R >> 1 for a step during a portClosed-portChoked only
-                        % sequence. See commit [wip 4b534a7].
-                        % Fallback case when M_R is too far away from
-                        % subsonic.
-                        caseKey = 'relaxation';
-                        qPort = q_R;
-                    end
-                end
-                reiterationCount = reiterationCount + 1;
+                % Select sonic or subsonic treatment based on qPort
+                [qPort, caseKey] = tryCasesContraction(qPort);
                 
+                reiterationCount = reiterationCount + 1;                
                 if reiterationCount > 100
                     error('Cant decide which case this is. Help!')
                 end
             end
-            
         else % APortExposed > obj.physConst.crossSectionalArea (expansion)
-            if pSonic_R < pBubble % [pSonic_R < pBubble] insufficient pressure to choke at port
-                caseKey = 'subsonic';
-                qPort = processSubsonicCase(q_R);
-            else
-                caseKey = 'chamberChokedForced';
-                % Mach 1 boundary condition at exit of PDE domain
-                qPort = processChamberChokedCase(q_R);
+            % Select sonic or subsonic treatment based on q_R
+            [qPort, caseKey] = tryCasesExpansion(q_R);
+            
+            caseKeyOld = '';
+            % Outer iteration loop: until the boundary case stabilizes
+            reiterationCount = 1;
+            while strcmpi(caseKeyOld, caseKey)
+                % Swap data
+                caseKeyOld = caseKey;
+                % Select sonic or subsonic treatment based on qPort
+                [qPort, caseKey] = tryCasesExpansion(qPort);
+                
+                reiterationCount = reiterationCount + 1;                
+                if reiterationCount > 100
+                    error('Cant decide which case this is. Help!')
+                end
             end
         end
     end

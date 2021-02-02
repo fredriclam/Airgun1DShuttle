@@ -49,7 +49,15 @@ end
 %   Assumes static T(q_R) in
 %     T(q_R) \ q_R == T(q_R) \ qTarget
 B = P / (obj.schm.T(q_R));
-nullVector = null(B);
+
+try
+    nullVector = null(B);
+catch
+    warning('null failed')
+    qTarget = NaN(size(q_R));
+    exitFlag = -9;
+    return
+end
 if size(nullVector,2) > 1
     error('Nullity of characteristics preservation > 1. Unexpected!')
 end
@@ -58,11 +66,17 @@ end
 qConstrained = @(deviationScalar) q_R + deviationScalar*nullVector;
 
 % 1-D solve for target state that satisfies the essential constraint
+try
 [deviationScalar, ~, exitFlag] = ...
     fzero(@(deviationScalar) ...
           essentialConstraint(qConstrained(deviationScalar)), ...
           0, ...
           optimset('Display','none'));
+catch
+    warning('fzero failed')
+    deviationScalar = NaN;
+    exitFlag = -9;
+end
 
 if exitFlag == -4
     try

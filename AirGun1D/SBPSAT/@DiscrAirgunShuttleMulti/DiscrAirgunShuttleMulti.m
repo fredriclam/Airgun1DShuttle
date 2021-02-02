@@ -135,15 +135,15 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 agState = obj.fullState(q, t, bubble, shuttle, REVERT_MODEL);
                 
                 %% Check pre-compute state
-                assert(agState.eulerDomainStates.p_R > 0);
-                assert(agState.eulerDomainStates.T_R > 0);
-                assert(agState.eulerDomainStates.rho_R > 0);
-                assert(isreal(agState.eulerDomainStates.M_R));
-                assert(~isnan(agState.eulerDomainStates.M_R));
-                assert(agState.eulerDomainStates.T_R > 0 && ...
-                       agState.eulerDomainStates.p_R > 0  && ...
-                       agState.eulerDomainStates.c_R > 0);
-                assert(agState.portStates.rhoPort > 0);
+%                 assert(agState.eulerDomainStates.p_R > 0);
+%                 assert(agState.eulerDomainStates.T_R > 0);
+%                 assert(agState.eulerDomainStates.rho_R > 0);
+%                 assert(isreal(agState.eulerDomainStates.M_R));
+%                 assert(~isnan(agState.eulerDomainStates.M_R));
+%                 assert(agState.eulerDomainStates.T_R > 0 && ...
+%                        agState.eulerDomainStates.p_R > 0  && ...
+%                        agState.eulerDomainStates.c_R > 0);
+%                 assert(agState.portStates.rhoPort > 0);
 %                 assert(agState.portStates.APortExposed > 0 || ...
 %                        agState.portStates.velocityPort == 0);
                     
@@ -217,8 +217,11 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                             dq = dq + closure_r_closed(q);
                         end
                         if schm.flowStateR(q) ~= scheme.Euler1d.SUPERSONIC_OUTFLOW
+%                             dq = dq + closure_r_char(q, ...
+%                                 agState.portStates.wPort);
                             dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
                         else
+                            dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
                             warning('log supsonic outflow AND sonic port')
                         end
                     elseif strcmpi('chamberChokedForced', ...
@@ -229,8 +232,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 
                 %% Post-compute checks
                 if ~all(isreal(dq))
-                    error('Complex dq encountered.')
-                    dq = real(dq);
+%                     error('Complex dq encountered.')
+%                     dq = real(dq);
                 end
                 
                 %% Bubble evolution

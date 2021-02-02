@@ -39,7 +39,12 @@ end
                 ((gamma + 1)/2).^(-(gamma+1)/2/(gamma-1));
         else
             % Return interpolated (vector) value of M
-            outputM = interp1(areaRatioVector, MVector, inputA);
+            try
+                outputM = interp1(areaRatioVector, MVector, inputA);
+            catch
+                warning('Illegal interp in precomputeMachAreaFunction > interpolateM')
+                outputM = MVector(1);
+            end
         end
     end
 exportFunction = @(inputA) interpolateM(inputA);

@@ -21,7 +21,7 @@ function [solution, metadata, solShuttleFree] = ...
     %% Defaults for this function
     % Plot every [s]
     PLOT_INTERVAL = 1e-2;
-    REL_TOL = 1e-4;
+    REL_TOL = 1e-5; % 1e-3 to 1e-5 OK
                         
     %% User checking and unpacking input parameters
     if nargin < 3 || nargin > 5
@@ -148,8 +148,10 @@ function [solution, metadata, solShuttleFree] = ...
     %% Run ODE solver
     % Set ODE solver options
     options = odeset('RelTol',REL_TOL);
-    sol_ode = ode45(@odefun, tspan, y0,options);
+    sol_ode = ode23(@odefun, tspan, y0,options);
 
+    disp('ODE solver complete.')
+    
     %% Split quantities from state space vector
     ind1 = 1;
     ind2 = length(q0);
@@ -207,28 +209,27 @@ function [solution, metadata, solShuttleFree] = ...
         end
     end
     
-    % Use same initial bubble size for both
-    y0 = [q0; bubble0; shuttle0];
-
-    %% Run ODE solver
-    % Set ODE solver options
-    options = odeset('RelTol',1e-4);
-    sol_ode = ode45(@odefun, tspan, y0,options);
-    
-    ind1 = 1;
-    ind2 = ind1+length(q0)-1;
-    q2 = sol_ode.y(ind1:ind2, :);
-
-    ind1 = ind2+1;
-    ind2 = ind1+length(bubble0)-1;
-    bubble2 = sol_ode.y(ind1:ind2, :);
-
-    ind1 = ind2+1;
-    ind2 = ind1+length(shuttle0)-1;
-    shuttle2 = sol_ode.y(ind1:ind2, :);
+%     % Use same initial bubble size for both
+%     y0 = [q0; bubble0; shuttle0];
+% 
+%     %% Run ODE solver
+%     % Set ODE solver options
+%     options = odeset('RelTol',1e-4);
+%     sol_ode = ode45(@odefun, tspan, y0,options);
+%     
+%     ind1 = 1;
+%     ind2 = ind1+length(q0)-1;
+%     q2 = sol_ode.y(ind1:ind2, :);
+% 
+%     ind1 = ind2+1;
+%     ind2 = ind1+length(bubble0)-1;
+%     bubble2 = sol_ode.y(ind1:ind2, :);
+% 
+%     ind1 = ind2+1;
+%     ind2 = ind1+length(shuttle0)-1;
+%     shuttle2 = sol_ode.y(ind1:ind2, :);
     
     % End wall clock timer
-    
     metadata.wallClockTotalSeconds = toc(wallClockStart);
 end
 
