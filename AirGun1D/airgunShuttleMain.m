@@ -88,7 +88,7 @@ metadata = struct(...
 return
 
 %% Mass Deploy
-nxVector = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65];
+nxVector = [10, 15, 20, 25, 30, 35, 40];
 pool = gcp();
 for i = 1:length(nxVector)
     nx_now = nxVector(i);
@@ -106,17 +106,36 @@ end
 
 %  airgunShuttleDeploy(nx)
 
-%% Collect and save data
+%% Collect data
 % Use separate variable names for smaller variables
 for i = 1:6
-    eval(sprintf('savedResults%d = futures(%d).OutputArguments', i, i));
+    eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
+
+% Save data
+% save('session-data', 'savedResults', '-v7.3');
+% Watch out! These variables can be huge.
+% for i = 1:6
+%     eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
+%     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
+% end
 
 
 return
 
-%% Call postprocess routines
+%% Postprocess routines
+
+figure(9);
+tSample = linspace(metadata.tspan(1), 0.1, 1000);
+
+for i = 1:length(savedResults)
+    pressureSignalFn = airgunShuttleSignature(savedResults{i}{1}, ...
+        savedResults{i}{2});
+    pressureSignals{i} = pressureSignalFn(tSample);
+end
+
+%% Call postprocess routines (legacy)
 
 % fullState1 = airgunShuttlePostprocess(savedResults1{1}, savedResults1{2});
 % airgunShuttlePostprocess(savedResults1{1}, savedResults1{2}, fullState1);
@@ -170,6 +189,22 @@ plot([10, 15, 20, 25, 30], [e1, e2, e3, e4, e5], 'k.-', 'MarkerSize', 18);
 xlabel('$n_x$', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$\max |(\Delta p)_i - (\Delta p)_\mathrm{ref}|$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 %% Post processing
 gamma = 1.4;

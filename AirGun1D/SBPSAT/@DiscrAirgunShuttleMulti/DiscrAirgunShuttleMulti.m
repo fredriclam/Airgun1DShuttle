@@ -209,7 +209,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         % the characteristic closure is used for the
                         % subsonic, and compare to using pPort instead.
                         dq = dq + closure_r_char(q, ...
-                            agState.portStates.wPort);
+                            agState.portStates.wPort, ...
+                            agState.portStates.qPort);
                     elseif strcmpi('portChoked', ...
                             agState.portStates.caseKey)
                         if agState.portStates.velocityPort <= 0
@@ -226,7 +227,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         end
                     elseif strcmpi('chamberChokedForced', ...
                         agState.portStates.caseKey)
-                            dq = dq + closure_r_char(q, agState.portStates.wPort);
+                            dq = dq + closure_r_char(q, agState.portStates.wPort, ...
+                            agState.portStates.qPort);
                     end
                 end
                 
