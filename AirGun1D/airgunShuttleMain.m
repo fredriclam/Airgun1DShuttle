@@ -88,6 +88,11 @@ metadata = struct(...
 return
 
 %% Mass Deploy
+
+addpath .\FlowRelations
+addpath .\SBPSAT
+addpath ..\sbplib
+
 nxVector = [10, 15, 20, 25, 30, 35, 40];
 pool = gcp();
 for i = 1:length(nxVector)
@@ -97,18 +102,20 @@ for i = 1:length(nxVector)
     futures(i) = parfeval(pool, @airgunShuttleDeploy, 2, nx_now);
 end
 
-outputs = cell(1,length(nxVector));
-for i = 1:length(nxVector)
-    [completedIndex, val] = fetchNext(futures);
-    outputs{completedIndex} = val;
-    disp("Completed job " + completedIndex)
-end
+% Blocking fetch
+% outputs = cell(1,length(nxVector));
+% for i = 1:length(nxVector)
+%     [completedIndex, val] = fetchNext(futures);
+%     outputs{completedIndex} = val;
+%     disp("Completed job " + completedIndex)
+% end
 
 %  airgunShuttleDeploy(nx)
 
 %% Collect data
 % Use separate variable names for smaller variables
-for i = 1:6
+% Manually specify usable data range
+for i = 1:7
     eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
@@ -124,16 +131,63 @@ end
 
 return
 
-%% Postprocess routines
+%% Compute pressure signals at far field
 
-figure(9);
+solution = savedResults{1}{1};
+metadata = savedResults{1}{2};
+
 tSample = linspace(metadata.tspan(1), 0.1, 1000);
-
 for i = 1:length(savedResults)
     pressureSignalFn = airgunShuttleSignature(savedResults{i}{1}, ...
         savedResults{i}{2});
     pressureSignals{i} = pressureSignalFn(tSample);
 end
+
+%% Plot pressure signals
+figure(9);
+subplot(1,3,1);
+for i = 1:length(savedResults)
+    plot(tSample, pressureSignals{i}, '-', 'LineWidth', 1);
+    hold on
+end
+hold off
+xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend
+
+subplot(1,3,2);
+for i = 1:length(savedResults)-1
+    plot(tSample, pressureSignals{i}-pressureSignals{end}, '-', 'LineWidth', 1);
+    hold on
+end
+hold off
+xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$(\Delta p)_i - (\Delta p)_\mathrm{ref}$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend
+
+subplot(1,3,3);
+for i = 1:length(savedResults)-1
+    errorToRef(i) = norm(pressureSignals{i}-pressureSignals{end}, 'inf');
+end
+plot(nxVector(1:length(savedResults)-1), errorToRef, 'k.-', 'MarkerSize', 18);
+xlabel('$n_x$', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\max |(\Delta p)_i - (\Delta p)_\mathrm{ref}|$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+
+
+
+
+
+
+
+
+
+
+
+return
 
 %% Call postprocess routines (legacy)
 
