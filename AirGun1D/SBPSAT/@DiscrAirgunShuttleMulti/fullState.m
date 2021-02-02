@@ -12,6 +12,7 @@ exception = [];
 % Disable to improve speed; enable to debug Euler domain states
 INCLUDE_ALL_PRIMITIVES = false;
 
+iterativeSolveTol = 1e3*eps;
 
 %% Compute primitive variables at right of PDE domain
 q_R = obj.schm.e_R'*q;
@@ -35,8 +36,11 @@ pStagnationFn = @(q) obj.schm.p(q) * ...
 p0_R = p_R * ...
     (machFactor(M_R))^(obj.physConst.gamma/(obj.physConst.gamma-1));
 % Compute sonic pressure
-pSonic_R = p0_R * ...
+pSonicFn = @(q) pStagnationFn (q) * ...
     (machFactor(1))^(-obj.physConst.gamma/(obj.physConst.gamma-1));
+pSonic_R = pSonicFn(q_R);
+% pSonic_R = p0_R * ...
+%     (machFactor(1))^(-obj.physConst.gamma/(obj.physConst.gamma-1));
 
 %% Capture flow state in PDE domain
 flowState = obj.schm.flowStateR(q);
@@ -147,6 +151,38 @@ function [qNew, exitFlag, iterateCount] = iterateToTol(callback, q, tol)
     end
 end
 
+% Try cases for contraction flow
+function [qOut, caseKeyOut] = tryCasesContraction(qIn)
+if pSonicFn(qIn) < pBubble
+    caseKeyOut = 'subsonic';
+    qOut = iterateToTol(...
+        @processSubsonicCase, ...
+        qIn, ...
+        1e3*eps);
+else
+    caseKeyOut = 'portChoked';
+    [qOut, exitFlag, iterateCount] = iterateToTol(...
+        @processPortChokedCase, ...
+        qIn, ...
+        1e3*eps);
+    if exitFlag ~= 1 || ...
+            qOut(3) < 0 || ...
+            ~(obj.schm.c(qOut) > 0) || ...
+            ~(obj.schm.p(qOut) > 0)
+        % Relax the numerics (required for predictor steps
+        % sometimes)
+        % Issue:
+        % M_R >> 1 for a step during a portClosed-portChoked only
+        % sequence. See commit [wip 4b534a7].
+        % Fallback case when M_R is too far away from
+        % subsonic, and we fail to find a q such that M(q) = 1
+        % while preserving the outgoing characteristics.
+        caseKeyOut = 'relaxation';
+        qOut = qIn;
+    end
+end
+end
+
 %% Compute boundary details
 if REVERT_MODEL
     caseKey = 'noShuttle';
@@ -170,58 +206,30 @@ else
         (shuttle(1) - obj.physConst.portLead) / ...
         (obj.physConst.operatingChamberLength - obj.physConst.portLead)]);
     
-    % Treat M_R as <= 1
+    % Compute initial q from q_R such that M_R as <= 1
     if M_R > 1
+        % Iteratively solve for q
         [q_RMod, exitFlag] = iterateToTol(...
             @processChamberChokedCase, ...
             q_R, ...
-            1e3*eps);
+            iterativeSolveTol);
+        % Replace q_R with modified q if such a solution is found
         if exitFlag == 1
             q_R = q_RMod;
         end
     end
     
-    % Case dependent boundary values
-    if APortExposed == 0 % Case 0A: port is closed
-        % This case is final. No negotiation if the port is closed!
+    % Compute new q_R depending on boundary case
+    if APortExposed == 0 % port is closed
+        % Kinematically-constrained case; no boundary values necessary
+        % (wall closure used)
         caseKey = 'portClosed'; % Port is closed
-        massFlowPort = 0;
-        velocityPort = 0;
         qPort = q_R;
-        % TODO: should be also a preservation BC
     else
         if APortExposed <= obj.physConst.crossSectionalArea % (contraction)
-            if pSonic_R < pBubble
-                caseKey = 'subsonic';
-                qPort = iterateToTol(...
-                    @processSubsonicCase, ...
-                    q_R, ...
-                    1e3*eps);
-            else 
-                caseKey = 'portChoked';
-                % TODO: Log
-                [qPort, exitFlag, ~] = iterateToTol(...
-                    @processPortChokedCase, ...
-                    q_R, ...
-                    1e3*eps);
-                if exitFlag ~= 1 || ...
-                        qPort(3) < 0 || ...
-                        ~(obj.schm.c(qPort) > 0) || ...
-                        ~(obj.schm.p(qPort) > 0)
-                    % Relax the numerics (required for predictor steps
-                    % sometimes)
-                    % Issue:
-                    % M_R >> 1 for a step during a portClosed-portChoked only
-                    % sequence. See commit [wip 4b534a7].
-                    % Fallback case when M_R is too far away from
-                    % subsonic, and we fail to find a q such that M(q) = 1
-                    % while preserving the outgoing characteristics.
-                    caseKey = 'relaxation';
-                    qPort = q_R;
-                end
-            end
+            [qPort, caseKey] = tryCasesContraction(q_R);
             
-            caseKeyOld = "";
+            caseKeyOld = '';
             % Reiteration
             reiterationCount = 1;
             while ~strcmpi(caseKeyOld, caseKey)
