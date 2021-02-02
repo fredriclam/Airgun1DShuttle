@@ -92,14 +92,33 @@ metadata = struct(...
 
 
 
+%% Mass Deploy
+nxVector = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65];
+pool = gcp();
+for i = 1:length(nxVector)
+    nx_now = nxVector(i);
+    
+    % Call function [solution, metadata] = airgunShuttleDeploy(nx)
+    futures(i) = parfeval(pool, @airgunShuttleDeploy, 2, nx_now);
+end
 
+outputs = cell(1,length(nxVector));
+for i = 1:length(nxVector)
+    [completedIndex, val] = fetchNext(futures);
+    outputs{completedIndex} = val;
+    disp("Completed job " + completedIndex)
+end
 
+%  airgunShuttleDeploy(nx)
 
+%% Collect and save data
+% Use separate variable names for smaller variables
+for i = 1:6
+    eval(sprintf('savedResults%d = futures(%d).OutputArguments', i, i));
+%     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
+end
 
-
-
-
-
+%%
 return
 
 %% Post processing

@@ -1,38 +1,30 @@
+function gridFullStates = airgunShuttlePostprocess(solution, metadata, gridFullStates)
+if nargin == 3
+    % Full states already computed
+    requireStateComputation = false;
+elseif nargin == 2
+    requireStateComputation = true;
+end
+
 q1History = solution.q(1:3:end,:);
-q2History = solution.q(2:3:end,:);
-q3History = solution.q(3:3:end,:);
 
-
-tHistory = solution.soln.x;
-
-% (tHistory, q1History)
-% 
-% metadata.discretization.schm.p()
-
-% Initialize scalar values at eval points
-rhoHistory = nan(size(q1History));
-pHistory = nan(size(q1History));
-uHistory = nan(size(q1History));
-cHistory = nan(size(q1History));
-MHistory = nan(size(q1History));
-THistory = nan(size(q1History));
-
-clear gridFullStates;
 %% Full state function
-% for i = 1:size(q1History,1)
-for j = 1:size(q1History,2)
-    bubble = solution.bubble(:,j);
-    shuttle = solution.shuttle(:,j);
-    t = solution.soln.x(j);
-    gridFullStates(j) = metadata.discretization.fullState(...
-        solution.q(:,j), ...
-        t, ...
-        bubble, ...
-        shuttle, ...
-        false ...
-    );
-end 
-% end
+if requireStateComputation
+    disp('State struct vector not provided. Computing state functions.')
+    for j = 1:size(q1History,2)
+        bubble = solution.bubble(:,j);
+        shuttle = solution.shuttle(:,j);
+        t = solution.soln.x(j);
+        gridFullStates(j) = metadata.discretization.fullState(...
+            solution.q(:,j), ...
+            t, ...
+            bubble, ...
+            shuttle, ...
+            false ...
+        );
+    end 
+    disp('State functions computed. Plotting and returning state.')
+end
 
 %% Figure 1: Phase plot
 eDS = [gridFullStates.eulerDomainStates];
@@ -53,49 +45,41 @@ ARatio = portArea / csArea;
 caseKeyHistory = cellfun(@(k) caseKey2Num(k), {pS.caseKey});
 
 figure(1); clf;
-subplot(1,2,1);
 
-if false
-    % Plain color plot
-    plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
-    text(pRatio(1),0.05,'Start')
+%% Add phase plots
+% Find all case key switches
+caseKeySwitchIndices = [0, find(...
+    caseKeyHistory(2:end) ~= caseKeyHistory(1:end-1),...
+    length(caseKeyHistory)-1)];
+colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
+
+subPlotHandle2 = subplot(2,3,2);
+% Dummy lines for legend
+for i = 1:6
+    plot(pRatio(1), ARatio(1), [colorMap{i}, '-'])
     hold on
-    plot(pRatio, ARatio, 'k', 'LineWidth', 1)
-    hold off
-else
-    % Color coded plot
-    % Find all case key switches
-    caseKeySwitchIndices = [0, find(...
-        caseKeyHistory(2:end) ~= caseKeyHistory(1:end-1),...
-        length(caseKeyHistory)-1)];
-    
-    colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
-    % Dummy lines for legend
-    for i = 1:6
-        plot(pRatio(1), ARatio(1), [colorMap{i}, '-'])
-        hold on
-    end
-    
-    for i = 1:length(caseKeySwitchIndices)-1
-        % Include the right boundary element too for continuity
-        plotRange = caseKeySwitchIndices(i)+1:caseKeySwitchIndices(i+1)+1;
-        plot(pRatio(plotRange), ARatio(plotRange), ...
-            [colorMap{1+caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
-        hold on
-    end
-    
-    plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
-    text(pRatio(1),0.05,'Start')
-    hold off
-    
-    legendLabels = {'Closed', ...
-        'Subsonic', ...
-        'Port choked', ...
-        'Chamber choked', ...
-        'Chamber choked*', ...
-        'Relaxation'};
-    legend(legendLabels, 'Interpreter', 'latex')
 end
+
+for i = 1:length(caseKeySwitchIndices)-1
+    % Include the right boundary element too for continuity
+    plotRange = caseKeySwitchIndices(i)+1:caseKeySwitchIndices(i+1)+1;
+    plot(pRatio(plotRange), ARatio(plotRange), ...
+        [colorMap{1+caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
+    hold on
+end
+
+plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
+text(pRatio(1),0.05,'Start')
+hold off
+
+legendLabels = {'Closed', ...
+    'Subsonic', ...
+    'Port choked', ...
+    'Chamber choked', ...
+    'Chamber choked*', ...
+    'Relaxation'};
+legend(legendLabels, 'Interpreter', 'latex')
+
 
 xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
@@ -110,7 +94,7 @@ set(gca, ...
     'YMinorGrid', 'on' ...
 );
 
-subplot(1,2,2);
+subPlotHandle3 = subplot(2,3,3);
 plot(M_RHistory(1), ARatio(1), 'k.', 'MarkerSize', 24)
 text(M_RHistory(1),0.05,'Start')
 hold on
@@ -129,11 +113,23 @@ set(gca, ...
     'YMinorGrid', 'on' ...
 );
 
-set(gcf, 'position', ...
-    [-1714         369        1420         573]);
+%% Text descriptor
+subplot(2,3,4);
+axis off
+text(0.0, 0.8, sprintf('$n_x = %d$ per m', metadata.nx), 'Interpreter', 'latex', ...
+    'FontSize', 13);
+pressureInitialMpa = metadata.discretization.schm.p(metadata.q0(1:3))/1e6;
+pressureInitialPsi = pressureInitialMpa * 145.038;
+text(0.0, 0.7, sprintf('Initial $p$: $%.1f$ MPa = $%.0f$ psi', ...
+    pressureInitialMpa, pressureInitialPsi), 'Interpreter', 'latex', ...
+    'FontSize', 13);
+text(0.0, 0.5, sprintf('Wall clock time: $%.1f$ s', ...
+    metadata.wallClockTotalSeconds), 'Interpreter', 'latex', ...
+    'FontSize', 13);
 
-%% Figure 2-4: Wing plots
-figure(2); clf;
+
+%% Add wing plots
+subPlotHandle5 = subplot(2,3,5);
 plot(pRatio, solution.soln.x, 'k', 'LineWidth', 1)
 xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
@@ -147,10 +143,8 @@ set(gca, ...
     'YGrid', 'on', ...
     'YMinorGrid', 'on' ...
 );
-set(gcf, 'position', ...
-    [-1613          56         616         224]);
 
-figure(3); clf;
+subPlotHandle1 = subplot(2,3,1);
 plot(solution.soln.x, ARatio, 'k', 'LineWidth', 1)
 xlabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
@@ -164,10 +158,8 @@ set(gca, ...
     'YGrid', 'on', ...
     'YMinorGrid', 'on' ...
 );
-set(gcf, 'position', ...
-    [-1903         376         306         565]);
 
-figure(4); clf;
+subPlotHandle2 = subplot(2,3,6);
 plot(M_RHistory, solution.soln.x, 'k', 'LineWidth', 1)
 xlabel ('$M_\mathrm{R}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
@@ -181,8 +173,29 @@ set(gca, ...
     'YGrid', 'on', ...
     'YMinorGrid', 'on' ...
 );
+
+%% Reposition subplots
+subplot(2,3,1);
+set(gca, 'position', [0.07, 0.5 0.15 0.45])
+
+subplot(2,3,2);
+set(gca, 'position', [0.29, 0.5 0.30 0.45])
+
+subplot(2,3,3);
+set(gca, 'position', [0.66, 0.5 0.30 0.45])
+
+subplot(2,3,4);
+set(gca, 'position', [0.07, 0.15 0.15 0.25])
+
+subplot(2,3,5);
+set(gca, 'position', [0.29, 0.15 0.30 0.25])
+
+subplot(2,3,6);
+set(gca, 'position', [0.66, 0.15 0.30 0.25])
+
+%%
 set(gcf, 'position', ...
-    [ -986    54   623   224]);
+    [ -1877 54 1514 869]);
 
 %% Figure 5: case keys
 figure(5); clf;
@@ -209,22 +222,7 @@ labels = {
 };
 set(gca, 'YTick', 0:5, 'YTickLabel', labels)
 
-%% Explicit [deprecated]
-% Extract states manually
-% for i = 1:size(q1History,1)
-%     % Extract q for this grid point x, for all t
-%     qHistoryFixedSpace = [q1History(i,:); 
-%                           q2History(i,:);
-%                           q3History(i,:)];
-%     % Compute useful states
-%     rhoHistory(i,:) = q1History(i,:);
-%     pHistory(i,:) = metadata.discretization.schm.p(qHistoryFixedSpace);
-%     uHistory(i,:) = q2History(i,:) ./ q1History(i,:);
-%     cHistory(i,:) = metadata.discretization.schm.c(qHistoryFixedSpace);
-%     MHistory(i,:) = uHistory(i,:) ./ cHistory(i,:);
-%     THistory(i,:) = pHistory(i,:) ./ ...
-%         (metadata.discretization.physConst.Q * rhoHistory(i,:));
-% end
+end
 
 function caseNum = caseKey2Num(caseKey)
     if strcmpi('portClosed', caseKey)
