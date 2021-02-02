@@ -21,9 +21,9 @@ runShuttleFreeFlag = false;
 
 %% Set ambient parameters
 nx = 20;                % Default: 100           % Number of grid points per 1 m of air gun length
-r = 10;                                           % Distance from source to receiver [m]
-c_inf = 1482;                                     % Speed of sound in water [m/s]
-rho_inf = 1000;                                   % Density of water [kg/m^3]
+% r = 10;                                           % Distance from source to receiver [m]
+% c_inf = 1482;                                     % Speed of sound in water [m/s]
+% rho_inf = 1000;                                   % Density of water [kg/m^3]
 airgunDepth = 10;                                 % Depth of airgun [m]
 bubbleInitialVolume = 600;                        % Initial volume [cui]
 airgunPressure = 1000;                            % Initial pressure in airgun [psi]
@@ -85,12 +85,7 @@ metadata = struct(...
 % TODO: Post check of boundary conditions in the real solution time points
 % monitor_postprocessing(monitorStates)
 
-
-
-
-
-
-
+return
 
 %% Mass Deploy
 nxVector = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65];
@@ -118,8 +113,63 @@ for i = 1:6
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
 
-%%
+
 return
+
+%% Call postprocess routines
+
+% fullState1 = airgunShuttlePostprocess(savedResults1{1}, savedResults1{2});
+% airgunShuttlePostprocess(savedResults1{1}, savedResults1{2}, fullState1);
+
+pressureSignalFn1 = airgunShuttleSignature(savedResults1{1}, savedResults1{2});
+pressureSignalFn2 = airgunShuttleSignature(savedResults3{1}, savedResults2{2});
+pressureSignalFn3 = airgunShuttleSignature(savedResults3{1}, savedResults3{2});
+pressureSignalFn4 = airgunShuttleSignature(savedResults4{1}, savedResults4{2});
+pressureSignalFn5 = airgunShuttleSignature(savedResults5{1}, savedResults5{2});
+pressureSignalFn6 = airgunShuttleSignature(savedResults6{1}, savedResults6{2});
+
+figure(9);
+tSample = linspace(metadata.tspan(1), 0.1, 1000);
+subplot(1,3,1);
+plot(tSample, pressureSignalFn1(tSample), '-', 'LineWidth', 1);
+hold on
+plot(tSample, pressureSignalFn2(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn3(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn4(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn5(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+hold off
+
+xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend
+
+subplot(1,3,2);
+e1 = norm(pressureSignalFn1(tSample)-pressureSignalFn6(tSample),'inf');
+e2 = norm(pressureSignalFn2(tSample)-pressureSignalFn6(tSample),'inf');
+e3 = norm(pressureSignalFn3(tSample)-pressureSignalFn6(tSample),'inf');
+e4 = norm(pressureSignalFn4(tSample)-pressureSignalFn6(tSample),'inf');
+e5 = norm(pressureSignalFn5(tSample)-pressureSignalFn6(tSample),'inf');
+plot(tSample, pressureSignalFn1(tSample)-pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+hold on
+plot(tSample, pressureSignalFn2(tSample)-pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn3(tSample)-pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn4(tSample)-pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+plot(tSample, pressureSignalFn5(tSample)-pressureSignalFn6(tSample), '-', 'LineWidth', 1);
+hold off
+
+xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$(\Delta p)_i - (\Delta p)_\mathrm{ref}$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend
+
+subplot(1,3,3);
+plot([10, 15, 20, 25, 30], [e1, e2, e3, e4, e5], 'k.-', 'MarkerSize', 18);
+
+xlabel('$n_x$', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\max |(\Delta p)_i - (\Delta p)_\mathrm{ref}|$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
 
 %% Post processing
 gamma = 1.4;
