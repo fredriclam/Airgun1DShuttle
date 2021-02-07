@@ -211,6 +211,156 @@ set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
 
 return
 
+
+%%
+F_to_K = @(F) 5/9*(F-32) + 273.15;
+
+figure(10);
+subplot(1,3,3);
+T_exper_K = F_to_K(HiTestData(24).iNetCh4Data);
+% Manual search index
+begin_index = 3700;
+end_index = begin_index+600;
+% Plot thermocouple data [K] vs. t [ms]
+plot(1000*(HiTestData(24).iNetTimeAxisT(begin_index:end_index) - ...
+    HiTestData(24).iNetTimeAxisT(begin_index)), ...
+    T_exper_K(begin_index:end_index), '.'); % [K] vs [s]
+xlim([0, 300]);
+ylim([120, 300]);
+title('Closed-end temperature data');
+    
+%% Wave travel time (experimental data)    
+figure;
+begin_index = 0;
+end_index = 10000;
+begin_index_P = 5*begin_index;
+end_index_P = begin_index_P + 5*(end_index-begin_index);
+
+% Useful downstream pressure sensor at Ch16
+%   Outside sensor at Ch10
+%   Upstream (port) presusre sensor at Ch13
+plot(1000*(HiTestData(24).iNetTimeAxisP), ...
+    HiTestData(24).iNetCh16Data);
+hold on
+plot(1000*(HiTestData(24).iNetTimeAxisT), ...
+    HiTestData(24).iNetCh7Data); % [K] vs [s]
+xlim([3660,3780])
+grid on
+grid minor
+    
+    %% Thermocouple responses
+    figure; clf
+    data_selection_index = 24;
+    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
+        F_to_K(HiTestData(data_selection_index).iNetCh1Data)); % 010
+    hold on
+    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
+        F_to_K(HiTestData(data_selection_index).iNetCh4Data)); % 005
+    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
+        F_to_K(HiTestData(data_selection_index).iNetCh7Data)); % 003
+    % Plot response time estimate using
+    % Omega J-type 60 ft./sec Air
+    % 427 deg C/38 deg C
+    % for 005 (0.005" diameter)
+    % N.B. I think we're using CHAL-005 K-type
+    % - Estimate for velocity near this point?
+    % http://www.newportus.com/ppt/IRCOCHAL.html
+    plot(3720*[1, 1], ylim,'--')
+    plot(3720*[1, 1]+80, ylim,'--')
+    legend({'010', '005', '003', 'Begin Estimate', '005 response time scale estimate'});
+    xlim(3600 + [0, 1500]); % for index 25
+    % xlim(20000 + [0, 1000]); % for index 25
+    % xlim(17500 + [0, 1000]); % for index 26
+    xlabel 't [ms]'
+    ylabel 'T [K]'
+
+%% Best experimental plot
+figure(2001); clf;
+subplot(2,2,1);
+
+cv = 718;
+T2 = (q2(3:3:end,:) - ...
+    0.5 * q2(2:3:end,:).^2 ./ q2(1:3:end,:)) ./ q2(1:3:end,:) / cv;
+
+offset_from_left = 1;
+% T_L2 = T2(30,:);
+T_L2 = T2(offset_from_left, :);
+
+subplot(2,2,1);
+plot(tAxis, T_L2, 'k-', 'LineWidth', 1);
+xlim([0, 300]);
+ylim([120, 300]);
+title('Model');
+xlabel('Time [s]')
+ylabel('T [K]')
+
+subplot(2,2,2);
+T_exper_K = F_to_K(HiTestData(24).iNetCh4Data);
+begin_index = 3700;
+end_index = begin_index+600;
+plot(1000*(HiTestData(24).iNetTimeAxisT(begin_index:end_index) - ...
+    HiTestData(24).iNetTimeAxisT(begin_index)), ...
+    T_exper_K(begin_index:end_index), 'b-', 'LineWidth', 1); % [K] vs [s]
+xlim([0, 300]);
+ylim([120, 300]);
+title('Thermocouple 005 vs model');
+xlabel('Time [s]')
+ylabel('T [K]')
+hold on
+plot(tAxis, T_L2, 'k-', 'LineWidth', 1);
+legend({'Data', 'Model'});
+
+subplot(2,2,3);
+plot(tAxis, p2(offset_from_left,:), 'k-', 'LineWidth', 1);
+xlim([0, 300]);
+title('Model');
+xlabel('Time [s]')
+ylabel('Pressure [Pa]')
+
+subplot(2,2,4);
+psiPa_conversion = 6894.75729;
+nominalminimum = 1000*psiPa_conversion; % 1000 psi
+begin_index = 3700*5;
+end_index = begin_index+1600*5;
+plot(1000*(HiTestData(24).iNetTimeAxisP(begin_index:end_index) - ...
+    HiTestData(24).iNetTimeAxisP(begin_index)), ...
+    nominalminimum + ...
+    psiPa_conversion*HiTestData(24).iNetCh16Data(begin_index:end_index)...
+    , 'b-', 'LineWidth', 1); % [K] vs [s]
+xlim([0, 300]);
+title('Pressure gauge (data + 1000 psi)');
+xlabel('Time [s]')
+ylabel('Pressure [Pa]')
+hold on
+plot(tAxis, p2(offset_from_left,:), 'k-', 'LineWidth', 1);
+legend({'Data', 'Model'});
+
+for i = 1:4
+    subplot(2,2,i);
+    grid minor
+    grid on
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+return
+
 %% Call postprocess routines (legacy)
 
 % fullState1 = airgunShuttlePostprocess(savedResults1{1}, savedResults1{2});
