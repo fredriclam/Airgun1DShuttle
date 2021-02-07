@@ -28,18 +28,23 @@ end
 
 %% Figure 1: Phase plot
 eDS = [gridFullStates.eulerDomainStates];
+pS = [gridFullStates.portStates];
+
 pSonic_RHistory = [eDS.pSonic_R];
 p_RHistory = [eDS.p_R];
 M_RHistory = [eDS.M_R];
+MHatHistory = [pS.MPort];
+pSonicHatHistory = [pS.pSonicPort];
 
-pS = [gridFullStates.portStates];
+
 portArea = [pS.APortExposed];
 csArea = metadata.discretization.physConst.crossSectionalArea;
 
 bS = [gridFullStates.bubbleStates];
 pBubbleHistory = [bS.p];
 
-pRatio = pSonic_RHistory ./ pBubbleHistory ;
+pRatioGridValue = pSonic_RHistory ./ pBubbleHistory ;
+pRatioHat = pSonicHatHistory ./ pBubbleHistory ;
 ARatio = portArea / csArea;
 
 caseKeyHistory = cellfun(@(k) caseKey2Num(k), {pS.caseKey});
@@ -56,20 +61,20 @@ colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
 subPlotHandle2 = subplot(2,3,2);
 % Dummy lines for legend
 for i = 1:6
-    plot(pRatio(1), ARatio(1), [colorMap{i}, '-'])
+    plot(pRatioHat(1), ARatio(1), [colorMap{i}, '-'])
     hold on
 end
 
 for i = 1:length(caseKeySwitchIndices)-1
     % Include the right boundary element too for continuity
     plotRange = caseKeySwitchIndices(i)+1:caseKeySwitchIndices(i+1)+1;
-    plot(pRatio(plotRange), ARatio(plotRange), ...
+    plot(pRatioHat(plotRange), ARatio(plotRange), ...
         [colorMap{1+caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
     hold on
 end
 
-plot(pRatio(1), ARatio(1), 'k.', 'MarkerSize', 24)
-text(pRatio(1),0.05,'Start')
+plot(pRatioHat(1), ARatio(1), 'k.', 'MarkerSize', 24)
+text(pRatioHat(1),0.05,'Start')
 hold off
 
 legendLabels = {'Closed', ...
@@ -81,7 +86,7 @@ legendLabels = {'Closed', ...
 legend(legendLabels, 'Interpreter', 'latex')
 
 
-xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
+xlabel ('$\hat{p}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
 set(gca, ...
     'FontSize', 14, ...
@@ -95,12 +100,12 @@ set(gca, ...
 );
 
 subPlotHandle3 = subplot(2,3,3);
-plot(M_RHistory(1), ARatio(1), 'k.', 'MarkerSize', 24)
-text(M_RHistory(1),0.05,'Start')
+plot(MHatHistory(1), ARatio(1), 'k.', 'MarkerSize', 24)
+text(MHatHistory(1),0.05,'Start')
 hold on
-plot(M_RHistory, ARatio, 'k', 'LineWidth', 1)
+plot(MHatHistory, ARatio, 'k', 'LineWidth', 1)
 hold off
-xlabel ('$M_\mathrm{R}$', 'Interpreter', 'latex', 'FontSize', 18)
+xlabel ('$\hat{M}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
 set(gca, ...
     'FontSize', 14, ...
@@ -130,9 +135,16 @@ text(0.0, 0.5, sprintf('Wall clock time: $%.1f$ s', ...
 
 %% Add wing plots
 subPlotHandle5 = subplot(2,3,5);
-plot(pRatio, solution.soln.x, 'k', 'LineWidth', 1)
-xlabel ('$p_\mathrm{R}^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
+plot(pRatioHat, solution.soln.x, '-g', 'LineWidth', 1)
+hold on
+plot(pRatioGridValue, solution.soln.x, ':k', 'LineWidth', 1.5)
+hold off
+xlabel ('$p^*/p_\mathrm{b}$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
+legend({'$\hat{p}^*/p_\mathrm{b}$','$p_\mathrm{R}^*/p_\mathrm{b}$'}, ...
+    'location', 'best', ...
+    'Interpreter', 'latex' ...
+);
 set(gca, ...
     'FontSize', 14, ...
     'TickLabelInterpreter', 'latex', ...
@@ -160,9 +172,16 @@ set(gca, ...
 );
 
 subPlotHandle2 = subplot(2,3,6);
-plot(M_RHistory, solution.soln.x, 'k', 'LineWidth', 1)
-xlabel ('$M_\mathrm{R}$', 'Interpreter', 'latex', 'FontSize', 18)
+plot(MHatHistory, solution.soln.x, '-g', 'LineWidth', 1)
+hold on
+plot(M_RHistory, solution.soln.x, ':k', 'LineWidth', 1.5)
+hold off
+xlabel ('$M$', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$t [s]$', 'Interpreter', 'latex', 'FontSize', 18)
+legend({'$\hat{M}$','$M_\mathrm{R}$'}, ...
+    'location', 'best', ...
+    'Interpreter', 'latex' ...
+);
 set(gca, ...
     'FontSize', 14, ...
     'TickLabelInterpreter', 'latex', ...

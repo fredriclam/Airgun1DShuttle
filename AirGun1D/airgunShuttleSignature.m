@@ -4,7 +4,7 @@
 function [pressureSignalFn, tInterp, pressureSignal] = ...
     airgunShuttleSignature(solution, metadata)
 
-r = 10;           % Distance from source to receiver [m]
+r = 6;           % Distance from source to receiver [m]
 c_inf = 1482;     % Speed of sound in water [m/s]
 rho_inf = 1000;   % Density of water [kg/m^3]
 depth = metadata.paramAirgun.airgunDepth;

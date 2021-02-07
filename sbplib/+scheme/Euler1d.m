@@ -286,14 +286,25 @@ classdef Euler1d < scheme.Scheme
         function closure = boundary_condition_char(obj,boundary)
             [e_s, e_S] = obj.getBoundaryOperator({'e', 'E'}, boundary);
             s = obj.getBoundarySign(boundary);
-
-            function o = closure_fun(q, w_data)
+            
+            function o = closure_fun(q, w_data, q_data)
                 q_s = e_S'*q;
-                rho = q_s(1);
-                u = q_s(2)/rho;
-                e = q_s(3);
+                
+                % Experimental swap: same closure function, but using tau =
+                % tau(qhat) instead of tau(e_S' * q).
+                if false
+                    q_data = q_s;
+                end
+                rho = q_data(1);
+                u = q_data(2)/rho;
+                e = q_data(3);
+%                 rho = q_s(1);
+%                 u = q_s(2)/rho;
+%                 e = q_s(3);
 
-                c = obj.c(q_s);
+                c = obj.c(q_data);
+%                 c = obj.c(q_s);
+                
 
                 Lambda = [u, u+c, u-c];
 
@@ -303,7 +314,8 @@ classdef Euler1d < scheme.Scheme
                 p = [p_in p_ot];
                 pt(p) = 1:length(p);
 
-                T = obj.T(q_s);
+                T = obj.T(q_data);
+%                 T = obj.T(q_s);
 
                 tau1 = -2*diag(abs(Lambda(p_in)));
                 tau2 = zeros(length(p_ot),length(p_in)); % Penalty only on ingoing char.
@@ -312,7 +324,8 @@ classdef Euler1d < scheme.Scheme
 
                 tau = -s*e_S*sparse(T*tauHat(pt,:));
 
-                w_s = inv(T)*q_s;
+                w_s = (obj.T(q_s))\q_s;
+%                 w_s = inv(T)*q_s;
                 w_in = w_s(p_in);
 
                 w_in_data = w_data(p_in);

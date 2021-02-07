@@ -263,7 +263,12 @@ else
         % Kinematically-constrained case; no boundary values necessary
         % (wall closure used)
         caseKey = 'portClosed'; % Port is closed
-        qPort = q_R;
+        % Compute q-hat such that velocity is removed
+        % Note: this value is not used for boundary enforcement (see
+        % closure function instead)
+        qPort = [rho_R;
+                 0;
+                 e_tot_R - 0.5 * rho_R * u_R^2];
     else
         if APortExposed <= obj.physConst.crossSectionalArea % (contraction)
             % Select sonic or subsonic treatment based on q_R
@@ -315,6 +320,7 @@ else
     MPort = velocityPort / cPort;
     massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
     wPort = mapq2characteristics(qPort);
+    pSonicPort = pSonicFn(qPort);
 end
 
 %% Post-process state
@@ -358,7 +364,8 @@ portStates = struct( ...
     'caseKey', caseKey, ...
     'ARatio', APortExposed / obj.physConst.crossSectionalArea, ...
     'qPort', qPort, ...
-    'wPort', wPort ...
+    'wPort', wPort, ...
+    'pSonicPort', pSonicPort ...
 );
 eulerDomainStates = struct(...
     'rho', rhoEulerDomain, ...

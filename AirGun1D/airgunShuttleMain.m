@@ -89,11 +89,16 @@ return
 
 %% Mass Deploy
 
+% Disable assertion when deploying!
+% File path must be correct (check the following addpath is successful)
+assert(strcmpi('C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
+    cd))
+
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
 
-nxVector = [10, 15, 20, 25, 30, 35, 40];
+nxVector = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70];
 pool = gcp();
 for i = 1:length(nxVector)
     nx_now = nxVector(i);
@@ -115,7 +120,7 @@ end
 %% Collect data
 % Use separate variable names for smaller variables
 % Manually specify usable data range
-for i = 1:7
+for i = 1:9
     eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
@@ -131,6 +136,16 @@ end
 
 return
 
+%% Postprocess best result
+if ~exist('fullStateBest','var')
+fullStateBest = airgunShuttlePostprocess(savedResults{length(savedResults)}{1}, ...
+    savedResults{length(savedResults)}{2});
+else
+    airgunShuttlePostprocess(savedResults{length(savedResults)}{1}, ...
+    savedResults{length(savedResults)}{2}, fullStateBest);
+end
+
+
 %% Compute pressure signals at far field
 
 solution = savedResults{1}{1};
@@ -143,6 +158,8 @@ for i = 1:length(savedResults)
     pressureSignals{i} = pressureSignalFn(tSample);
 end
 
+
+
 %% Plot pressure signals
 figure(9);
 subplot(1,3,1);
@@ -154,7 +171,12 @@ hold off
 xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
-legend
+
+legendEntries = {};
+for i = 1:length(savedResults)
+    legendEntries{i} = sprintf('$n_x = %d$', nxVector(i));
+end
+legend(legendEntries, 'Interpreter', 'latex')
 
 subplot(1,3,2);
 for i = 1:length(savedResults)-1
@@ -165,7 +187,7 @@ hold off
 xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$(\Delta p)_i - (\Delta p)_\mathrm{ref}$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
-legend
+legend(legendEntries{1:end-1}, 'Interpreter', 'latex')
 
 subplot(1,3,3);
 for i = 1:length(savedResults)-1
