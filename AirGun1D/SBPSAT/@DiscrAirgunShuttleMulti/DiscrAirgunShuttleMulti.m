@@ -269,7 +269,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
         end
         
         % Declare state computation function
-        agState = fullState(obj, q, t, bubble, shuttle, REVERT_MODEL)
+        agState = fullState(obj, q, t, bubble, shuttle, REVERT_MODEL, INCLUDE_ALL_PRIMITIVES)
         
         % Declare constraint enforcement function
         [qTarget, exitFlag] = enforceScalarConstraint(obj, essentialConstraint, q_R)

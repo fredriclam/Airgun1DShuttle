@@ -1,5 +1,5 @@
 function [agState, exception] = ...
-    fullState(obj, q, t, bubble, shuttle, REVERT_MODEL)
+    fullState(obj, q, t, bubble, shuttle, REVERT_MODEL, INCLUDE_ALL_PRIMITIVES)
 % Computes the full state of the airgun from the state
 % vector. Returns a named struct with subsystem variables.
 %
@@ -9,8 +9,11 @@ function [agState, exception] = ...
 % TODO: track #evals of each case
 
 exception = [];
-% Disable to improve speed; enable to debug Euler domain states
-INCLUDE_ALL_PRIMITIVES = false;
+
+if nargin <= 6
+    % Disable to improve speed; enable to debug Euler domain states
+    INCLUDE_ALL_PRIMITIVES = false;
+end
 
 % Tolerance for iterateToTol
 iterativeSolveTol = 1e-8;

@@ -13,9 +13,6 @@ tspan = [0; 0.200];
 runShuttleFreeFlag = false;
 
 %% Set ambient parameters
-r = 10;                                           % Distance from source to receiver [m]
-c_inf = 1482;                                     % Speed of sound in water [m/s]
-rho_inf = 1000;                                   % Density of water [kg/m^3]
 airgunDepth = 10;                                 % Depth of airgun [m]
 bubbleInitialVolume = 600;                        % Initial volume [cui]
 airgunPressure = 1000;                            % Initial pressure in airgun [psi]
@@ -26,7 +23,8 @@ airgunInnerDiameter = 10.020;                     % Inner diameter of airgun [in
 airgunCrossSecArea = pi*airgunInnerDiameter^2/4;  % Firing chamber cross-sectional area [in^2]
 airgunLength = airgunVolume / ...
     airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
-% Function prescribing firing chamber profile. Not used in current version.
+% Function prescribing firing chamber profile for future implementation
+% Not used in current version.
 airgunFiringChamberProfile = @(x) error(...
     'Not implemented. Placeholder for firing chamber profile function.');
 

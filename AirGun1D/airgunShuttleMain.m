@@ -1,5 +1,3 @@
-
-
 % Main script for orchestrating code runs of airgun model with shuttle.
 % 
 % Uses SBPlib to set up the 1D Euler domain for the interior of the airgun
@@ -7,78 +5,8 @@
 % domain and the bubble. Adapted from WIP test_launch_script_v1.m script.
 
 clear; clc;
-addpath .\FlowRelations
-addpath .\SBPSAT
-addpath ..\sbplib
 
-%% Simulation controls
-% Simulation window [s]
-% Suggested values:
-% 0.100 to 0.600 s
-tspan = [0; 0.200];
-% Set flag for running shuttle-free model
-runShuttleFreeFlag = false;
-
-%% Set ambient parameters
-nx = 20;                % Default: 100           % Number of grid points per 1 m of air gun length
-% r = 10;                                           % Distance from source to receiver [m]
-% c_inf = 1482;                                     % Speed of sound in water [m/s]
-% rho_inf = 1000;                                   % Density of water [kg/m^3]
-airgunDepth = 10;                                 % Depth of airgun [m]
-bubbleInitialVolume = 600;                        % Initial volume [cui]
-airgunPressure = 1000;                            % Initial pressure in airgun [psi]
-
-%% Set firing chamber parameters
-airgunVolume = 20600;                             % Volume of airgun [cui]
-airgunInnerDiameter = 10.020;                     % Inner diameter of airgun [in]
-airgunCrossSecArea = pi*airgunInnerDiameter^2/4;  % Firing chamber cross-sectional area [in^2]
-airgunLength = airgunVolume / ...
-    airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
-% Function prescribing firing chamber profile. Not used in current version.
-airgunFiringChamberProfile = @(x) error(...
-    'Not implemented. Placeholder for firing chamber profile function.');
-
-%% Set port parameters
-airgunPortAreaRatio = 0.5;                        % Portion of lateral area covered by port [-]
-airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
-airgunPortLength = 2.5;                           % Length of port [in]
-airgunPortArea = airgunPortAreaRatio * ...
-    pi * airgunOuterDiameter * airgunPortLength;  % Effective port area [in^2]
-% Shuttle parameters
-shuttleBdryPenaltyStrength = 1e11;                % Linear elastic penalty term for shuttle [N/m]
-
-%% Set operating chamber specifications
-airCushionLength = 0.542*0.0254;                  % Length of closed air cushioning effect [m]
-accelerationLength = (3.009-0.542)*0.0254;        % Length over which shuttle accelerates freely [m]
-
-% Compression factor of air cushion as function of shuttle position
-airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
-    + (xi - accelerationLength > 0) * ...
-    (airCushionLength / (airCushionLength - (xi - accelerationLength)));
-
-%% Housekeeping: Data packing
-paramAirgun = struct(...
-    'airgunPressure', airgunPressure, ...
-    'airgunLength', airgunLength, ...
-    'airgunCrossSecArea', airgunCrossSecArea, ...
-    'airgunPortArea', airgunPortArea, ....
-    'airgunDepth', airgunDepth, ...
-    'airgunFiringChamberProfile', airgunFiringChamberProfile, ...
-    'airgunOperatingChamberProfile', airgunOperatingChamberProfile, ...
-    'bubbleInitialVolume', bubbleInitialVolume, ...
-    'shuttleBdryPenaltyStrength', shuttleBdryPenaltyStrength);
-% Initialize metadata struct for documenting results
-metadata = struct(...
-    'paramAirgun', paramAirgun, ...
-    'nx', nx, ...
-    'tspan', tspan);
-
-%% Run solve for both models    
-[solution, metadata, solShuttleFree] = ...
-    runEulerCodeShuttleDual(nx, tspan, ...
-                            paramAirgun, runShuttleFreeFlag, metadata);
-
-%% Postprocess 1: Plot closed chamber evolution
+%% TODO: Plot closed chamber evolution
 % TODO: Implement chambers passing data
 % TODO: Implement passing exceptions
 % TODO: Implement use of post-processing in Chambers
@@ -93,7 +21,6 @@ return
 % File path must be correct (check the following addpath is successful)
 assert(strcmpi('C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
     cd))
-
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
@@ -133,7 +60,6 @@ end
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 % end
 
-
 return
 
 %% Postprocess best result
@@ -164,11 +90,11 @@ end
 figure(9);
 subplot(1,3,1);
 for i = 1:length(savedResults)
-    plot(tSample, pressureSignals{i}, '-', 'LineWidth', 1);
+    plot(1e3*tSample, pressureSignals{i}, '-', 'LineWidth', 1);
     hold on
 end
 hold off
-xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
 
@@ -180,11 +106,11 @@ legend(legendEntries, 'Interpreter', 'latex')
 
 subplot(1,3,2);
 for i = 1:length(savedResults)-1
-    plot(tSample, pressureSignals{i}-pressureSignals{end}, '-', 'LineWidth', 1);
+    plot(1e3*tSample, pressureSignals{i}-pressureSignals{end}, '-', 'LineWidth', 1);
     hold on
 end
 hold off
-xlabel('$t$ [s]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$(\Delta p)_i - (\Delta p)_\mathrm{ref}$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
 legend(legendEntries{1:end-1}, 'Interpreter', 'latex')
@@ -212,154 +138,129 @@ set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
 return
 
 
-%%
-F_to_K = @(F) 5/9*(F-32) + 273.15;
+%% [NO SHIP] - Temperature figure
+% Figure not shipped with paper (too much dependence on thermocouple
+% instrument response time).
+% Difficulty in measuring temperature at a good time-accuracy while
+% being strong enough to survive shocks within the firing chamber;
+% and calibration charts for the thermocouple are typically provided for
+% highly subsonic flow conditions
+% May suggest in the future simulations of an incoming planar shock to the
+% end of the firing chamber to find the best thermocouple configuration.
 
-figure(10);
-subplot(1,3,3);
+figure(901); clf;
+
+% Convert experimental data from deg F to K
+F_to_K = @(F) 5/9*(F-32) + 273.15;
 T_exper_K = F_to_K(HiTestData(24).iNetCh4Data);
-% Manual search index
+% Manual search index input
 begin_index = 3700;
 end_index = begin_index+600;
+
 % Plot thermocouple data [K] vs. t [ms]
 plot(1000*(HiTestData(24).iNetTimeAxisT(begin_index:end_index) - ...
     HiTestData(24).iNetTimeAxisT(begin_index)), ...
     T_exper_K(begin_index:end_index), '.'); % [K] vs [s]
-xlim([0, 300]);
-ylim([120, 300]);
-title('Closed-end temperature data');
-    
-%% Wave travel time (experimental data)    
-figure;
-begin_index = 0;
-end_index = 10000;
-begin_index_P = 5*begin_index;
-end_index_P = begin_index_P + 5*(end_index-begin_index);
-
-% Useful downstream pressure sensor at Ch16
-%   Outside sensor at Ch10
-%   Upstream (port) presusre sensor at Ch13
-plot(1000*(HiTestData(24).iNetTimeAxisP), ...
-    HiTestData(24).iNetCh16Data);
 hold on
-plot(1000*(HiTestData(24).iNetTimeAxisT), ...
-    HiTestData(24).iNetCh7Data); % [K] vs [s]
-xlim([3660,3780])
-grid on
-grid minor
-    
-    %% Thermocouple responses
-    figure; clf
-    data_selection_index = 24;
-    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
-        F_to_K(HiTestData(data_selection_index).iNetCh1Data)); % 010
-    hold on
-    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
-        F_to_K(HiTestData(data_selection_index).iNetCh4Data)); % 005
-    plot(1000*(HiTestData(data_selection_index).iNetTimeAxisT), ...
-        F_to_K(HiTestData(data_selection_index).iNetCh7Data)); % 003
-    % Plot response time estimate using
-    % Omega J-type 60 ft./sec Air
-    % 427 deg C/38 deg C
-    % for 005 (0.005" diameter)
-    % N.B. I think we're using CHAL-005 K-type
-    % - Estimate for velocity near this point?
-    % http://www.newportus.com/ppt/IRCOCHAL.html
-    plot(3720*[1, 1], ylim,'--')
-    plot(3720*[1, 1]+80, ylim,'--')
-    legend({'010', '005', '003', 'Begin Estimate', '005 response time scale estimate'});
-    xlim(3600 + [0, 1500]); % for index 25
-    % xlim(20000 + [0, 1000]); % for index 25
-    % xlim(17500 + [0, 1000]); % for index 26
-    xlabel 't [ms]'
-    ylabel 'T [K]'
+new.eDS = [fullStateBest.eulerDomainStates];
+new.TAll = [new.eDS.T];
+new.T_L = new.TAll(1,:);
+plot(1000*[fullStateBest.t], ...
+    new.T_L, ...
+    'k-', 'LineWidth', 1);
+hold off
 
-%% Best experimental plot
-figure(2001); clf;
-subplot(2,2,1);
+legend({'Data (TC 005 at end)', '$T_\mathrm{L}$'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$T$ [K]', ...
+    'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
 
-cv = 718;
-T2 = (q2(3:3:end,:) - ...
-    0.5 * q2(2:3:end,:).^2 ./ q2(1:3:end,:)) ./ q2(1:3:end,:) / cv;
+%% Figure: Plot firing chamber closed-end (x = x_L) pressure
+figure(10); clf;
 
-offset_from_left = 1;
-% T_L2 = T2(30,:);
-T_L2 = T2(offset_from_left, :);
-
-subplot(2,2,1);
-plot(tAxis, T_L2, 'k-', 'LineWidth', 1);
-xlim([0, 300]);
-ylim([120, 300]);
-title('Model');
-xlabel('Time [s]')
-ylabel('T [K]')
-
-subplot(2,2,2);
-T_exper_K = F_to_K(HiTestData(24).iNetCh4Data);
-begin_index = 3700;
-end_index = begin_index+600;
-plot(1000*(HiTestData(24).iNetTimeAxisT(begin_index:end_index) - ...
-    HiTestData(24).iNetTimeAxisT(begin_index)), ...
-    T_exper_K(begin_index:end_index), 'b-', 'LineWidth', 1); % [K] vs [s]
-xlim([0, 300]);
-ylim([120, 300]);
-title('Thermocouple 005 vs model');
-xlabel('Time [s]')
-ylabel('T [K]')
-hold on
-plot(tAxis, T_L2, 'k-', 'LineWidth', 1);
-legend({'Data', 'Model'});
-
-subplot(2,2,3);
-plot(tAxis, p2(offset_from_left,:), 'k-', 'LineWidth', 1);
-xlim([0, 300]);
-title('Model');
-xlabel('Time [s]')
-ylabel('Pressure [Pa]')
-
-subplot(2,2,4);
+% Prep PDE data
+new.pAll = [new.eDS.p];
+new.p_L = new.pAll(1,:);
+% Prep experimental data
 psiPa_conversion = 6894.75729;
-nominalminimum = 1000*psiPa_conversion; % 1000 psi
+nominalminimum = 1000*psiPa_conversion; % Voltage baseline at 0 psi
+% Manual data index input
 begin_index = 3700*5;
 end_index = begin_index+1600*5;
+
+% Plot pressure [MPa] vs. t [ms]
+plot(1000*[fullStateBest.t], 1e-6*new.p_L, 'k-', 'LineWidth', 1);
+hold on
 plot(1000*(HiTestData(24).iNetTimeAxisP(begin_index:end_index) - ...
     HiTestData(24).iNetTimeAxisP(begin_index)), ...
-    nominalminimum + ...
-    psiPa_conversion*HiTestData(24).iNetCh16Data(begin_index:end_index)...
-    , 'b-', 'LineWidth', 1); % [K] vs [s]
-xlim([0, 300]);
-title('Pressure gauge (data + 1000 psi)');
-xlabel('Time [s]')
-ylabel('Pressure [Pa]')
+    1e-6* (nominalminimum + ...
+    psiPa_conversion*HiTestData(24).iNetCh16Data(begin_index:end_index))...
+    , 'b-', 'LineWidth', 1);
+hold off
+
+xlim([0, 500]);
+
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
+legend({'Model $p_\mathrm{L}$', 'Data'}, ...
+    'Interpreter', 'latex', 'FontSize', 13);
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
+%% Figure: Pressure contours in x-t plot @ near time
+figure(11); clf;
+new.t = 1e3*[fullStateBest.t];
+% TODO: check metadata comes from the same source
+new.x = linspace(metadata.discretization.schm.u(1), ...
+    metadata.discretization.schm.u(end), size(new.pAll,1));
+
+[tGrid, xGrid] = meshgrid(new.t, new.x);
+contourf(xGrid(:,1:10000), tGrid(:,1:10000), 1e-6 * new.pAll(:,1:10000), ...
+    'LevelStep', 0.2);
+
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14)
+colormap cool
+set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
+% Plot tracker line for next figure
+tIndexSample = 5000;
+colorTrackerLine = [252, 111, 23]/255;
 hold on
-plot(tAxis, p2(offset_from_left,:), 'k-', 'LineWidth', 1);
-legend({'Data', 'Model'});
+plot([new.x(1) new.x(end)], new.t(5000)*[1 1], ...
+    'Color', colorTrackerLine, 'LineWidth', 0.5)
+hold off
 
-for i = 1:4
-    subplot(2,2,i);
-    grid minor
-    grid on
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+figure(12); clf;
+plot(new.x, 1e-6*new.pAll(:,5000), 'Color', colorTrackerLine, 'LineWidth', 1);
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 17)
+ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 17)
+set(gca, 'FontSize', 15, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+ylimCurrent = ylim;
+ylim([0, ylimCurrent(2)])
+xlim([new.x(1), 0]);
 return
+
+%% Figure: Pressure contours in x-t plot @ late time
+figure(13); clf;
+% contourf(xGrid, tGrid, 1e-6 * new.pAll, ...
+%     'LevelStep', 0.2);
+contourf(xGrid(:,18000:end), tGrid(:,18000:end), 1e-6 * new.pAll(:,18000:end), ...
+    'LevelStep', 0.005);
+
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14)
+colormap cool
+set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
 
 %% Call postprocess routines (legacy)
 
