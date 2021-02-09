@@ -22,6 +22,9 @@ function [solution, metadata, solShuttleFree] = ...
     % Plot every [s]
     PLOT_INTERVAL = 1e-2;
     REL_TOL = 1e-5; % 1e-3 to 1e-5 OK
+    
+    % Final t to run the (uncoupled) bubble model to
+    tBubbleFinal = 10;
                         
     %% User checking and unpacking input parameters
     if nargin < 3 || nargin > 5
@@ -150,7 +153,8 @@ function [solution, metadata, solShuttleFree] = ...
     options = odeset('RelTol',REL_TOL);
     sol_ode = ode23(@odefun, tspan, y0,options);
 
-    disp('ODE solver complete.')
+    fprintf('ODE solve complete for coupled phase ([%.3f, %.3f] s).\n', ...
+        tspan(1), tspan(2));
     
     %% Split quantities from state space vector
     ind1 = 1;
@@ -165,11 +169,31 @@ function [solution, metadata, solShuttleFree] = ...
     ind2 = ind1+length(shuttle0)-1;
     shuttle = sol_ode.y(ind1:ind2, :);
     
+    %% Uncoupled bubble solve
+    % Provided the provided tspan allows for solution of the coupled system
+    % up to the port closing permanently, the following solve takes into
+    % account the bubble with no mass or energy input.
+    % Reduced memory and computational cost.
+    disp('Starting ODE solve for uncoupled bubble.');
+    
+    solnBubbleContinuation = ode23(...
+        @(t,y) bubbleRHS(y, 0, 0, 0, 0, 0, discretization.physConst), ...
+        [tspan(2), tBubbleFinal], bubble(:,end),options);
+    
+    bubbleContinuationTime = [sol_ode.x, ...
+        solnBubbleContinuation.x(2:end)];
+    bubbleContinuationState = [sol_ode.y(length(q0)+1:length(q0)+length(bubble0), :), ...
+        solnBubbleContinuation.y(:,2:end)];
+    
+    %% Data packing
     solution = struct( ...
         'soln', sol_ode, ...
         'q', q, ...
         'bubble', bubble, ...
-        'shuttle', shuttle ...
+        'shuttle', shuttle, ...
+        'bubbleContinuationTime', bubbleContinuationTime, ...
+        'bubbleContinuationState', bubbleContinuationState, ...
+        'solnBubbleContinuation', solnBubbleContinuation ...
     );
     
     %% Old model [WIP]
@@ -231,5 +255,6 @@ function [solution, metadata, solShuttleFree] = ...
     
     % End wall clock timer
     metadata.wallClockTotalSeconds = toc(wallClockStart);
+    disp('Job finished.')
 end
 

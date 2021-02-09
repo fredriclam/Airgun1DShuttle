@@ -10,9 +10,9 @@ rho_inf = 1000;   % Density of water [kg/m^3]
 depth = metadata.paramAirgun.airgunDepth;
 
 %% Define functions
-RFn = @(t) bubbleRadiusFn(solution.soln, t, size(solution.q,1));
-RDotFn = @(t) bubbleVelocityFn(solution.soln, t, size(solution.q,1));
-RDotDotFn = @(t) bubbleAccelFn(solution.soln, t, size(solution.q,1));
+RFn = @(t) bubbleRadiusFn(solution, t);
+RDotFn = @(t) bubbleVelocityFn(solution, t, size(solution.q,1));
+RDotDotFn = @(t) bubbleAccelFn(solution, t, size(solution.q,1));
 
 pressureDirect = @(t) rho_inf / (4*pi) * ...
     [RDotDotFn(t - r/c_inf) /r ];
@@ -32,33 +32,63 @@ end
 end
 
 %% Pressure data at closed end
-function R = bubbleRadiusFn(odeSoln, t, qSize)
-    % Initial quiescent signal
+function R = bubbleRadiusFn(solution, t, qSize)
     R = nan(size(t));
-    R(t < 0) = 0;
-
-    [sol, solDY] = deval(odeSoln, t(t >= 0));
-    bubbleRIndex = qSize + 1;
-    R(t >= 0) = sol(bubbleRIndex,:);
-end
-
-function RDot = bubbleVelocityFn(odeSoln, t, qSize)
-    % Initial quiescent signal
-    RDot = nan(size(t));
-    RDot(t < 0) = 0;
     
-    [sol, solDY] = deval(odeSoln, t(t >= 0));
-    bubbleRDotIndex = qSize + 2;
-    RDot(t >= 0) = sol(bubbleRDotIndex,:);
+    for i = 1:length(t)
+        if t(i) < 0
+            % Initial quiescent signal
+            R(i) = solution.bubbleContinuationState(1);
+        elseif t(i) <= solution.soln.x(end)
+            % Extract bubble info from coupled phase
+            [sol, solDY] = deval(solution.soln, t(i));
+            bubbleRIndex = qSize + 1;
+            R(i) = sol(bubbleRIndex,:);
+        else
+            % Extract bubble info from uncoupled phase
+            [sol, solDY] = deval(solution.solnBubbleContinuation, t(i));
+            R(i) = sol(1,:);
+        end
+    end
 end
 
-function RDotDot = bubbleAccelFn(odeSoln, t, qSize)
+function RDot = bubbleVelocityFn(solution, t, qSize)
+    RDot = nan(size(t));
+    
+    for i = 1:length(t)
+        if t(i) < 0
+            % Initial quiescent signal
+            RDot(i) = 0;
+        elseif t(i) <= solution.soln.x(end)
+            % Extract bubble info from coupled phase
+            [sol, solDY] = deval(solution.soln, t(i));
+            bubbleRDotIndex = qSize + 2;
+            RDot(i) = sol(bubbleRDotIndex,:);
+        else
+            % Extract bubble info from uncoupled phase
+            [sol, solDY] = deval(solution.solnBubbleContinuation, t(i));
+            RDot(i) = sol(2,:);
+        end
+    end
+end
+
+function RDotDot = bubbleAccelFn(solution, t, qSize)
     % Initial quiescent signal
     RDotDot = nan(size(t));
-    RDotDot(t < 0) = 0;
-
-    [sol, solDY] = deval(odeSoln, t(t >= 0));
     
-    bubbleRDotIndex = qSize + 2;
-    RDotDot(t >= 0) = solDY(bubbleRDotIndex,:);
+    for i = 1:length(t)
+        if t(i) < 0
+            % Initial quiescent signal
+            RDotDot(i) = 0;
+        elseif t(i) <= solution.soln.x(end)
+            % Extract bubble info from coupled phase
+            [sol, solDY] = deval(solution.soln, t(i));
+            bubbleRDotIndex = qSize + 2;
+            RDotDot(i) = solDY(bubbleRDotIndex,:);
+        else
+            % Extract bubble info from uncoupled phase
+            [sol, solDY] = deval(solution.solnBubbleContinuation, t(i));
+            RDotDot(i) = solDY(2,:);
+        end
+    end
 end

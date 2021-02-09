@@ -19,13 +19,14 @@ return
 
 % Disable assertion when deploying!
 % File path must be correct (check the following addpath is successful)
-assert(strcmpi('C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
+assert(strcmpi(...
+    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
     cd))
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
 
-nxVector = [10, 15, 20, 25, 30, 35, 40, 50, 60, 70];
+nxVector = [20, 25, 30, 35, 40, 50, 60];
 pool = gcp();
 for i = 1:length(nxVector)
     nx_now = nxVector(i);
@@ -47,7 +48,7 @@ end
 %% Collect data
 % Use separate variable names for smaller variables
 % Manually specify usable data range
-for i = 1:9
+for i = 1:7
     eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
@@ -62,31 +63,28 @@ end
 
 return
 
+%% Pick best result
+solution = savedResults{length(savedResults)}{1};
+metadata = savedResults{length(savedResults)}{2};
+
 %% Postprocess best result
 if ~exist('fullStateBest','var')
-fullStateBest = airgunShuttlePostprocess(savedResults{length(savedResults)}{1}, ...
-    savedResults{length(savedResults)}{2});
+fullStateBest = airgunShuttlePostprocess(solution, metadata);
 else
-    airgunShuttlePostprocess(savedResults{length(savedResults)}{1}, ...
-    savedResults{length(savedResults)}{2}, fullStateBest);
+    airgunShuttlePostprocess(solution, metadata, fullStateBest);
 end
 
+pressureSignalFnBest = airgunShuttleSignature(solution,metadata);
 
 %% Compute pressure signals at far field
-
-solution = savedResults{1}{1};
-metadata = savedResults{1}{2};
-
-tSample = linspace(metadata.tspan(1), 0.1, 1000);
+tSample = linspace(metadata.tspan(1), 5, 1000);
 for i = 1:length(savedResults)
     pressureSignalFn = airgunShuttleSignature(savedResults{i}{1}, ...
         savedResults{i}{2});
     pressureSignals{i} = pressureSignalFn(tSample);
 end
 
-
-
-%% Plot pressure signals
+%% Plot pressure signals "convergence"
 figure(9);
 subplot(1,3,1);
 for i = 1:length(savedResults)
@@ -253,6 +251,18 @@ figure(13); clf;
 %     'LevelStep', 0.2);
 contourf(xGrid(:,18000:end), tGrid(:,18000:end), 1e-6 * new.pAll(:,18000:end), ...
     'LevelStep', 0.005);
+
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14)
+colormap cool
+set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
+%% Figure: Pressure contours in x-t plot (global)
+figure(14); clf;
+contourf(xGrid, tGrid, 1e-6 * new.pAll, ...
+    'LevelStep', 0.5);
 
 xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
