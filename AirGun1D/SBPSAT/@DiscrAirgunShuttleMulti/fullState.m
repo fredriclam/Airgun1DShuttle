@@ -229,17 +229,14 @@ end
 if REVERT_MODEL
     caseKey = 'noShuttle';
     % Fix outlet area to equal the cross-sectional area
-    APortExposed = obj.physConst.A;
-    if t <= obj.physConst.AirgunCutoffTime
-        massFlowPort = rho_R * u_R * APortExposed;
-        velocityPort = u_R;
-    else
-        massFlowPort = 0;
-        velocityPort = 0;
+    APortExposed = obj.physConst.crossSectionalArea;
+    qPort = q_R;
+    % Shutoff state:
+    if t > obj.physConst.airgunCutoffTime
+        uPort = qPort(2)/qPort(1);
+        qPort(3) = qPort(3) - 0.5 * qPort(1) * uPort^2;
+        qPort(2) = 0;
     end
-    rhoPort = rho_R;
-    pPort = p_R;
-    TPort = T_R;
 else
     % Approximate the total port length as the full travel of
     % the shuttle: the % of the travel is thus the % of the
@@ -311,20 +308,20 @@ else
             end
         end
     end
-    
-    % Compute primitives
-    rhoPort = qPort(1);
-    velocityPort = qPort(2) / qPort(1);
-    eTotalPort = qPort(3);
-    TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
-        obj.physConst.c_v;
-    pPort = obj.schm.p(qPort);
-    cPort = obj.schm.c(qPort);
-    MPort = velocityPort / cPort;
-    massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
-    wPort = mapq2characteristics(qPort);
-    pSonicPort = pSonicFn(qPort);
 end
+
+% Compute primitives
+rhoPort = qPort(1);
+velocityPort = qPort(2) / qPort(1);
+eTotalPort = qPort(3);
+TPort = (eTotalPort - 0.5 * rhoPort * velocityPort^2) / rhoPort / ...
+    obj.physConst.c_v;
+pPort = obj.schm.p(qPort);
+cPort = obj.schm.c(qPort);
+MPort = velocityPort / cPort;
+massFlowPort = rhoPort*velocityPort*obj.physConst.crossSectionalArea;
+wPort = mapq2characteristics(qPort);
+pSonicPort = pSonicFn(qPort);
 
 %% Post-process state
 % Compute port sound speed
@@ -403,10 +400,14 @@ bubbleStates = struct(...
 );
 bubbleStates.rho = bubbleStates.p / ...
     (obj.physConst.Q * bubbleStates.T);
-shuttleStates = struct(...
-    'pos', shuttle(1), ...
-    'vel', shuttle(2) ...
-);
+if length(shuttle) >= 2
+    shuttleStates = struct(...
+        'pos', shuttle(1), ...
+        'vel', shuttle(2) ...
+    );
+else
+    shuttleStates = struct();
+end
 
 agState = struct(...
     't', t, ...

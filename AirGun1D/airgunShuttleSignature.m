@@ -10,14 +10,20 @@ rho_inf = 1000;   % Density of water [kg/m^3]
 depth = metadata.paramAirgun.airgunDepth;
 
 %% Define functions
-RFn = @(t) bubbleRadiusFn(solution, t);
+RFn = @(t) bubbleRadiusFn(solution, t, size(solution.q,1));
 RDotFn = @(t) bubbleVelocityFn(solution, t, size(solution.q,1));
 RDotDotFn = @(t) bubbleAccelFn(solution, t, size(solution.q,1));
+VDotDotFn = @(t) 4*pi*(...
+    2*RFn(t) .* RDotFn(t).^2 ...
+    + RFn(t).^2 .* RDotDotFn(t));
+
+r1 = 6; % Direct APPROX
+r2 = norm([2*depth, r]);% Ghost trig APPROX
 
 pressureDirect = @(t) rho_inf / (4*pi) * ...
-    [RDotDotFn(t - r/c_inf) /r ];
+    (VDotDotFn(t - r1/c_inf) / r1 );
 pressureGhost = @(t) rho_inf / (4*pi) * ...
-    [RDotDotFn(t - (r+2*depth)/c_inf) / (r+2*depth)];
+    (VDotDotFn(t - r2/c_inf) / r2);
 pressureSignalFn = @(t) pressureDirect(t) - pressureGhost(t);
 
 %% Compute pressure signal over a default grid
@@ -31,7 +37,6 @@ end
 
 end
 
-%% Pressure data at closed end
 function R = bubbleRadiusFn(solution, t, qSize)
     R = nan(size(t));
     

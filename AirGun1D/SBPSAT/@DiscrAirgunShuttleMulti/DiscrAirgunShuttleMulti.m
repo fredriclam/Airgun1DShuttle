@@ -25,6 +25,9 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             % Whether to use a fixed area test problem instead
             FIXED_AREA_TEST_PROBLEM = false;
             
+            %% Default airgun cutoff
+            airgunCutoffTime = 0.100;
+            
             %% Initial setup
             % Start Timer
             wallClockSetupStart = tic();
@@ -34,9 +37,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 airgunDepth);
             % Add mid and operating chambers
             obj.chambers = Chambers();
-            % Reconfigure airgun for coupled model
-            if ~REVERT_MODEL
-                % Override configuration with backward-compatible setting
+            
+            % Add additional configuration with backward-compatible setting
                 [physConst, ~, ~, ~] = ...
                     configAirgun(...
                         'GeneralAirgun', ...
@@ -50,9 +52,15 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         bubbleInitialVolume, ...
                         shuttleBdryPenaltyStrength);
                 obj.physConst = physConst;
+                obj.physConst.airgunCutoffTime = airgunCutoffTime;
+            if ~REVERT_MODEL
                 % Replace this object's description
                 obj.description = ...
                     'Airgun augmented with shuttle + mid and op chambers.';
+            else
+                % Replace this object's description
+                obj.description = ...
+                    'Airgun with inactive shuttle + mid and op chambers.';
             end
             
             % Alias commonly used objects
@@ -133,29 +141,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 
                 %% Compute state dependent variables
                 agState = obj.fullState(q, t, bubble, shuttle, REVERT_MODEL);
-                
-                %% Check pre-compute state
-%                 assert(agState.eulerDomainStates.p_R > 0);
-%                 assert(agState.eulerDomainStates.T_R > 0);
-%                 assert(agState.eulerDomainStates.rho_R > 0);
-%                 assert(isreal(agState.eulerDomainStates.M_R));
-%                 assert(~isnan(agState.eulerDomainStates.M_R));
-%                 assert(agState.eulerDomainStates.T_R > 0 && ...
-%                        agState.eulerDomainStates.p_R > 0  && ...
-%                        agState.eulerDomainStates.c_R > 0);
-%                 assert(agState.portStates.rhoPort > 0);
-%                 assert(agState.portStates.APortExposed > 0 || ...
-%                        agState.portStates.velocityPort == 0);
-                    
-                % Check for inflow
-                if agState.eulerDomainStates.flowState ...
-                   == scheme.Euler1d.SUBSONIC_INFLOW ...
-                   && (~REVERT_MODEL || t < physConst.AirgunCutoffTime) ...
-                   && abs(agState.eulerDomainStates.u_R) > 1e-2
-%                         warning(['Significant inflow @ t = ' num2str(t) ...
-%                             '; u|x=0 = ' ...
-%                             num2str(agState.eulerDomainStates.u_R)]);
-                end
 
                 %% Shuttle (and operating chamber) dynamics
                 % Compute shuttle state evolution
@@ -182,7 +167,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     elseif schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW
                         dq = dq; %#ok<ASGSL>
                     else
-                        dq = dq + closure_r_out_sub(q, agStates.bubbleStates.p);
+                        dq = dq + closure_r_out_sub(q, agState.bubbleStates.p);
                     end
                 elseif FIXED_AREA_TEST_PROBLEM
                     % Test case: fixed port area override, such that the
@@ -201,43 +186,21 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         dq = dq + closure_r_closed(q);
                     elseif strcmpi('subsonic', ...
                             agState.portStates.caseKey)
-                        % Characteristic enforcement for subsonic
-                        % Issue: 
-                        % Need to use characteristic enforcement to get
-                        % subsonic when caseKey='subsonic' properly.
-                        % See github commit [wip a80282b], the first time
-                        % the characteristic closure is used for the
-                        % subsonic, and compare to using pPort instead.
-%                         dq = dq + closure_r_char(q, ...
-%                             agState.portStates.wPort, ...
-%                             agState.portStates.qPort);
                         dq = dq + closure_r_out_sub(q, ...
                             agState.portStates.pPort);
                     elseif strcmpi('portChoked', ...
                             agState.portStates.caseKey)
                         if agState.portStates.velocityPort <= 0
+                            % Safeguard backward flow
                             warning('port choked back flow')
                             dq = dq + closure_r_closed(q);
                         else
                             dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
                         end
-%                         dq = dq + closure_r_char(q, agState.portStates.wPort, agState.portStates.qPort);
-                        
-%                         if schm.flowStateR(q) == scheme.Euler1d.SUPERSONIC_OUTFLOW
-%                             warning('Supersonic outflow AND sonic port.')
-%                         end
                     elseif strcmpi('chamberChokedForced', ...
                         agState.portStates.caseKey)
                         dq = dq + closure_r_out_sub(q, agState.portStates.pPort);
-%                             dq = dq + closure_r_char(q, agState.portStates.wPort, ...
-%                             agState.portStates.qPort);
                     end
-                end
-                
-                %% Post-compute checks
-                if ~all(isreal(dq))
-%                     error('Complex dq encountered.')
-%                     dq = real(dq);
                 end
                 
                 %% Bubble evolution
@@ -261,8 +224,6 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     else
                         obj.bubbleFrozen = false;
                     end
-                    
-%                     assert(dBubble(3) >= 0)
                 end
             end
             

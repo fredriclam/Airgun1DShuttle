@@ -69,20 +69,118 @@ metadata = savedResults{length(savedResults)}{2};
 
 %% Postprocess best result
 if ~exist('fullStateBest','var')
-fullStateBest = airgunShuttlePostprocess(solution, metadata);
+    fullStateBest = airgunShuttlePostprocess(solution, metadata);
 else
     airgunShuttlePostprocess(solution, metadata, fullStateBest);
 end
 
 pressureSignalFnBest = airgunShuttleSignature(solution,metadata);
 
+%% Work with uncoupled model
+[solnUncoupled, metadataUncoupled] = airgunShuttleDeploy(50, false);
+fullStateUncoupled = airgunShuttlePostprocess(solnUncoupled, metadataUncoupled);
+
 %% Compute pressure signals at far field
-tSample = linspace(metadata.tspan(1), 5, 1000);
+tSample = linspace(metadata.tspan(1), 5, 15000);
 for i = 1:length(savedResults)
     pressureSignalFn = airgunShuttleSignature(savedResults{i}{1}, ...
         savedResults{i}{2});
     pressureSignals{i} = pressureSignalFn(tSample);
 end
+
+pressureSignalFnUncoupled = airgunShuttleSignature(solnUncoupled, ...
+    metadataUncoupled);
+pressureSignalUncoupled = pressureSignalFnUncoupled(tSample);
+
+%% Compare far-field pressures and bubble states
+figure(141); clf;
+subplot(2,2,1);
+plot(1e3*tSample, pressureSignals{7}, '-k', 'LineWidth', 1)
+hold on
+plot(1e3*tSample, pressureSignalUncoupled, '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+dataDAQ = HiTestData(25).entriesDAQ(4,1200:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.');
+hold off
+
+legend({...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms', ...
+    'Data (9m depth hydrophone)'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+subplot(2,2,2);
+new.bubbleStates = [solution.bubbleContinuationState];
+newUncoupled.bubbleStates = [solnUncoupled.bubbleContinuationState];
+
+plot(1e3*[solution.bubbleContinuationTime], new.bubbleStates(1,:), ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(1e3*[solnUncoupled.bubbleContinuationTime], newUncoupled.bubbleStates(1,:), '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$R$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13, ...
+    'Location', 'best')
+grid on
+grid minor
+
+subplot(2,2,3);
+plot(1e3*[solution.bubbleContinuationTime], new.bubbleStates(2,:), ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(1e3*[solnUncoupled.bubbleContinuationTime], newUncoupled.bubbleStates(2,:), '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\dot{R}$ [m/s]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+subplot(2,2,4);
+tAxis1 = 1e3*[solution.bubbleContinuationTime];
+tAxis1 = tAxis1(1:end-1);
+RDotDot1 = diff( new.bubbleStates(2,:) ) ./ diff (1e3*[solution.bubbleContinuationTime]);
+
+tAxis2 = 1e3*[solnUncoupled.bubbleContinuationTime];
+tAxis2 = tAxis2(1:end-1);
+RDotDot2 = diff( newUncoupled.bubbleStates(2,:) ) ./ diff (1e3*[solnUncoupled.bubbleContinuationTime]);
+
+plot(tAxis1, RDotDot1, ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(tAxis2, RDotDot2, '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\ddot{R}$ [m/s${}^2$]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
 
 %% Plot pressure signals "convergence"
 figure(9);
@@ -166,9 +264,16 @@ new.T_L = new.TAll(1,:);
 plot(1000*[fullStateBest.t], ...
     new.T_L, ...
     'k-', 'LineWidth', 1);
+
+newUncoupled.eDS = [fullStateUncoupled.eulerDomainStates];
+newUncoupled.TAll = [newUncoupled.eDS.T];
+newUncoupled.T_L = [newUncoupled.TAll(1,:)];
+plot(1000*[fullStateUncoupled.t], ...
+    newUncoupled.T_L, ...
+    'r-', 'LineWidth', 1);
 hold off
 
-legend({'Data (TC 005 at end)', '$T_\mathrm{L}$'}, ...
+legend({'Data (TC 005 at end)', '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
     'Interpreter', 'latex', 'FontSize', 13)
 xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$T$ [K]', ...
@@ -182,6 +287,8 @@ figure(10); clf;
 % Prep PDE data
 new.pAll = [new.eDS.p];
 new.p_L = new.pAll(1,:);
+newUncoupled.pAll = [newUncoupled.eDS.p];
+newUncoupled.p_L = newUncoupled.pAll(1,:);
 % Prep experimental data
 psiPa_conversion = 6894.75729;
 nominalminimum = 1000*psiPa_conversion; % Voltage baseline at 0 psi
@@ -190,20 +297,22 @@ begin_index = 3700*5;
 end_index = begin_index+1600*5;
 
 % Plot pressure [MPa] vs. t [ms]
-plot(1000*[fullStateBest.t], 1e-6*new.p_L, 'k-', 'LineWidth', 1);
-hold on
 plot(1000*(HiTestData(24).iNetTimeAxisP(begin_index:end_index) - ...
     HiTestData(24).iNetTimeAxisP(begin_index)), ...
     1e-6* (nominalminimum + ...
     psiPa_conversion*HiTestData(24).iNetCh16Data(begin_index:end_index))...
     , 'b-', 'LineWidth', 1);
+hold on
+plot(1000*[fullStateBest.t], 1e-6*new.p_L, 'k-', 'LineWidth', 1);
+plot(1000*[fullStateUncoupled.t], 1e-6*newUncoupled.p_L, 'r-', 'LineWidth', 1);
+
 hold off
 
 xlim([0, 500]);
 
 xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
-legend({'Model $p_\mathrm{L}$', 'Data'}, ...
+legend({'Data', 'Model $p_\mathrm{L}$', 'Model $p_\mathrm{L}$ no-shuttle 100 ms'}, ...
     'Interpreter', 'latex', 'FontSize', 13);
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on')
@@ -244,6 +353,44 @@ ylimCurrent = ylim;
 ylim([0, ylimCurrent(2)])
 xlim([new.x(1), 0]);
 return
+
+%% Analogue figure no-shuttle Pressure contours in x-t plot @ near time
+figure(111); clf;
+newUncoupled.t = 1e3*[fullStateUncoupled.t];
+% TODO: check metadata comes from the same source
+newUncoupled.x = linspace(metadataUncoupled.discretization.schm.u(1), ...
+    metadataUncoupled.discretization.schm.u(end), size(newUncoupled.pAll,1));
+
+[tGrid, xGrid] = meshgrid(newUncoupled.t, newUncoupled.x);
+contourf(xGrid(:,1:10000), tGrid(:,1:10000), 1e-6 * newUncoupled.pAll(:,1:10000), ...
+    'LevelStep', 0.2);
+
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14)
+colormap cool
+set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
+% Plot tracker line for next figure
+tIndexSample = 5000;
+colorTrackerLine = [0.64,0.08,0.18];
+hold on
+plot([newUncoupled.x(1) newUncoupled.x(end)], newUncoupled.t(5000)*[1 1], ...
+    'Color', colorTrackerLine, 'LineWidth', 0.5)
+hold off
+
+figure(112); clf;
+plot(newUncoupled.x, 1e-6*newUncoupled.pAll(:,5000), 'Color', colorTrackerLine, 'LineWidth', 1);
+xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 17)
+ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 17)
+set(gca, 'FontSize', 15, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+ylimCurrent = ylim;
+ylim([0, ylimCurrent(2)])
+xlim([newUncoupled.x(1), 0]);
+return
+
 
 %% Figure: Pressure contours in x-t plot @ late time
 figure(13); clf;

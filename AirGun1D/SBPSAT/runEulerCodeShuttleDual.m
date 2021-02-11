@@ -12,12 +12,10 @@
 % Output:
 %   solution -- Complete solution struct for coupled model
 %   metadata -- Updated metadata struct
-%   solShuttleFree -- Complete solution struct for shuttle-free model.
-%                     If runShuttleFreeFlag==false, returns []
 
-function [solution, metadata, solShuttleFree] = ...
+function [solution, metadata] = ...
     runEulerCodeShuttleDual(nx,tspan,paramAirgun,...
-                            runShuttleFreeFlag,metadata)
+                            coupleToShuttle,metadata)
     %% Defaults for this function
     % Plot every [s]
     PLOT_INTERVAL = 1e-2;
@@ -30,12 +28,8 @@ function [solution, metadata, solShuttleFree] = ...
     if nargin < 3 || nargin > 5
         error("Unknown number of parameters provided.");
     elseif nargin == 4
-        runShuttleFreeFlag = false;
-    end
-    
-    if ~runShuttleFreeFlag
-        % Set empty values for shuttlefree solution
-        solShuttleFree = [];
+        % Default: use coupled shuttle
+        coupleToShuttle = true;
     end
     
     try
@@ -66,7 +60,7 @@ function [solution, metadata, solShuttleFree] = ...
             airgunCrossSecArea, ...
             airgunDepth, ...
             airgunPortArea, ...
-            false, ...
+            ~coupleToShuttle, ...
             airgunFiringChamberProfile, ...
             airgunOperatingChamberProfile, ...
             bubbleInitialVolume, ...
@@ -90,13 +84,23 @@ function [solution, metadata, solShuttleFree] = ...
         q = y(1:length(q0));
         bubble = y(length(q0)+1:...
                    length(q0)+length(bubble0));
-        shuttle = y(length(q0)+length(bubble0)+1:...
-                    length(q0)+length(bubble0)+length(shuttle0));
+        if coupleToShuttle
+            shuttle = y(length(q0)+length(bubble0)+1:...
+                        length(q0)+length(bubble0)+length(shuttle0));
+        else
+            shuttle = zeros(size(length(shuttle0)));
+        end
+        
         %% Compute RHS
         [dq, dBubble, dShuttle] = ...
             RHS(q,t,bubble,shuttle);
+        
         %% Repack state
-        dy = [dq; dBubble; dShuttle];
+        if coupleToShuttle
+            dy = [dq; dBubble; dShuttle];
+        else
+            dy = [dq; dBubble];
+        end
 
         %% Plot every PLOT_INTERVAL
         if t - lastPlot >= PLOT_INTERVAL
@@ -142,7 +146,11 @@ function [solution, metadata, solShuttleFree] = ...
         end
     end
 
-    y0 = [q0; bubble0; shuttle0];
+    if coupleToShuttle
+        y0 = [q0; bubble0; shuttle0];
+    else
+        y0 = [q0; bubble0];
+    end
 
     % On setup completion
     metadata.wallClockSetupSeconds = toc(wallClockStart);    
@@ -165,9 +173,13 @@ function [solution, metadata, solShuttleFree] = ...
     ind2 = ind1+length(bubble0)-1;
     bubble = sol_ode.y(ind1:ind2, :);
 
-    ind1 = ind2+1;
-    ind2 = ind1+length(shuttle0)-1;
-    shuttle = sol_ode.y(ind1:ind2, :);
+    if coupleToShuttle
+        ind1 = ind2+1;
+        ind2 = ind1+length(shuttle0)-1;
+        shuttle = sol_ode.y(ind1:ind2, :);
+    end
+    
+    clear ind1 ind2;
     
     %% Uncoupled bubble solve
     % Provided the provided tspan allows for solution of the coupled system
@@ -195,63 +207,6 @@ function [solution, metadata, solShuttleFree] = ...
         'bubbleContinuationState', bubbleContinuationState, ...
         'solnBubbleContinuation', solnBubbleContinuation ...
     );
-    
-    %% Old model [WIP]
-    if runShuttleFreeFlag
-        dRevert = DiscrAirgunShuttleMulti(nx,orderSBP,airgunPressure,airgunLength, ...
-            airgunPortArea,airgunDepth,0,true);
-        
-        % Grab initial states for each subsystem (same for both systems)
-        q0 = dRevert.q0;
-        bubble0 = dRevert.bubble0;
-        RHS = dRevert.RHS;
-        % Grab ODE's RHS objects (Shuttle version has new boundary condition
-        % defined for the Euler domain)
-        
-        if true % in function RHS
-            % Extract concatenated data
-            ind1 = 1;
-            ind2 = ind1+length(q0)-1;
-            q2 = y(ind1:ind2);
-
-            ind1 = ind2+1;
-            ind2 = ind1+length(bubble0)-1;
-            bubble2 = y(ind1:ind2);
-
-            ind1 = ind2+1;
-            ind2 = ind1+length(shuttle0)-1;
-            shuttle2 = y(ind1:ind2);
-
-            ind1 = ind2+1;
-            ind2 = ind1+length(plug0)-1;
-            plug2 = y(ind1:ind2);
-
-            % Update new model
-            [dq, dBubble, dShuttle, dPlug, p_RTarget, u_RTarget, monitor, shuttleMonitor] = ...
-                RHS(q2,t,bubble2,shuttle2,plug2,p_RTarget,u_RTarget);
-            dyShuttle = [dq; dBubble; dShuttle; dPlug];
-        end
-    end
-    
-%     % Use same initial bubble size for both
-%     y0 = [q0; bubble0; shuttle0];
-% 
-%     %% Run ODE solver
-%     % Set ODE solver options
-%     options = odeset('RelTol',1e-4);
-%     sol_ode = ode45(@odefun, tspan, y0,options);
-%     
-%     ind1 = 1;
-%     ind2 = ind1+length(q0)-1;
-%     q2 = sol_ode.y(ind1:ind2, :);
-% 
-%     ind1 = ind2+1;
-%     ind2 = ind1+length(bubble0)-1;
-%     bubble2 = sol_ode.y(ind1:ind2, :);
-% 
-%     ind1 = ind2+1;
-%     ind2 = ind1+length(shuttle0)-1;
-%     shuttle2 = sol_ode.y(ind1:ind2, :);
     
     % End wall clock timer
     metadata.wallClockTotalSeconds = toc(wallClockStart);
