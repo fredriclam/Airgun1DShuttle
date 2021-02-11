@@ -1,4 +1,5 @@
-function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve(z, p_L, physConst, opChamber)
+function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve( ...
+    z, p_L, physConst, chamberSet)
 % Computes evolution of the state vector
 %   z = [pos; vel; m_L; E_L; m_R; E_R]
 % for the shuttle assembly and the operating chamber partitions (denoted
@@ -9,7 +10,7 @@ function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve(z, p_L, ph
 %     z = [pos; vel; m_L; E_L; m_R; E_R]
 %     p_L = pressure on left side of shuttle assembly (from firing chamber)
 %     physConst = struct of physical constants
-%     opChamber = object of type OperatingChamber
+%     chamberSet = object of type Chambers
 %   Output: dz = [dpos; dvel; ...; dE_R] (time derivatives of state z)
 %     p_rear = pressure at rear of shuttle, in operating chamber
 %     p_front = pressure at front of shuttle, in operating chamber
@@ -32,13 +33,13 @@ A_R = physConst.shuttle_area_right;
 
 % Compute mass flow rates
 % Geometrically constrained density
-rho_rear = m_rear / opChamber.rearVolume(z(1));
+rho_rear = m_rear / chamberSet.rearVolume(z(1));
 % Energy-constrained temperature
 T_rear = E_rear / (m_rear * physConst.c_v);
 % Ideal gas pressure
 p_rear = rho_rear * physConst.Q * T_rear;
 % Geometrically constrained density
-rho_front = m_front / opChamber.frontVolume(z(1));
+rho_front = m_front / chamberSet.frontVolume(z(1));
 % Energy-constrained temperature
 T_front = E_front / (m_front * physConst.c_v);
 % Ideal gas pressure
@@ -47,17 +48,26 @@ p_front = rho_front * physConst.Q * T_front;
 % In middle chamber: assumptions
 midChamberLength = 3.112 * 0.0254;
 A_Mid = physConst.shuttle_area_right_rear;
-p0_Mid = physConst.p_R0;
-% EAGE model: venting valve.
-% Here we assume the equilibration is instantaneous (to be replaced by
-% possible gas exchange to back chamber and exterior)
-p0_Mid = 9.8*1e4; % IMPORTANT: assuming depth of 10m, and also 1000kg/m^3
-% Allowing adiabatic compression
-% p_Mid = p0_Mid * (midChamberLength / ...
-%         (midChamberLength-z(1)))^physConst.gamma;
-% Alternative assumption: instantaneous equilibration of mid chamber
-% pressure
-p_Mid = p0_Mid;
+
+% IMPORTANT: assuming depth of 10m, and also 1000kg/m^3 water
+% Atmospheric plus water depth pressure
+pAmbient = 1e5 + 9.8*1e3 * 10;
+% Initial mid chamber pressure
+p0_Mid = pAmbient;
+
+if strcmpi('limit-vented', chamberSet.midChamberMode)
+    % p0_Mid = physConst.p_R0;
+    % EAGE model: venting valve.
+    % Here we assume the equilibration is instantaneous (to be replaced by
+    % possible gas exchange to back chamber and exterior)    
+    p_Mid = p0_Mid;
+elseif strcmpi('limit-closed', chamberSet.midChamberMode)
+    % Allowing adiabatic compression
+    p_Mid = p0_Mid * (midChamberLength / ...
+            (midChamberLength-z(1)))^physConst.gamma;
+else
+    warning('Mid chamber mode unset')
+end
 
 % Define local aliases
 g = physConst.gamma;
@@ -81,7 +91,7 @@ else
 end
 
 flowL2R = ...
-    flowSignL2R * opChamber.gapArea(z(1)) * M * ...
+    flowSignL2R * chamberSet.gapArea(z(1)) * M * ...
     sqrt(g * pMax * rhoMax) * ...
     (1 + (g-1)/2 * M^2)^(0.5*(-g-1)/(g-1));
 

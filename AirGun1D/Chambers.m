@@ -8,10 +8,11 @@ classdef Chambers
         shuttle_area_right_front
         shuttle_area_right_rear
         total_travel_length
+        midChamberMode
     end
     
     methods
-        function obj = Chambers()
+        function obj = Chambers(midChamberMode)
             %% Set data for operating chamber
             % Pistom diameter [m]
             obj.piston_diam = 11.1 * 0.0254;
@@ -27,6 +28,9 @@ classdef Chambers
             
             % Compute constrained geometric parameters
             obj.totalVolume = obj.rearVolume(obj.total_travel_length);
+            
+            % Assign mid chamber mode (string)
+            obj.midChamberMode = midChamberMode;
         end
         
         % Visualize the chambers (without the piston position)

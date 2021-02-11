@@ -69,7 +69,8 @@ metadata = savedResults{length(savedResults)}{2};
 
 %% Postprocess best result
 if ~exist('fullStateBest','var')
-    fullStateBest = airgunShuttlePostprocess(solution, metadata);
+    [fullStateBest, caseKeyContext] = ...
+        airgunShuttlePostprocess(solution, metadata);
 else
     airgunShuttlePostprocess(solution, metadata, fullStateBest);
 end
@@ -324,16 +325,20 @@ new.t = 1e3*[fullStateBest.t];
 new.x = linspace(metadata.discretization.schm.u(1), ...
     metadata.discretization.schm.u(end), size(new.pAll,1));
 
+subplot(1,2,1);
 [tGrid, xGrid] = meshgrid(new.t, new.x);
-contourf(xGrid(:,1:10000), tGrid(:,1:10000), 1e-6 * new.pAll(:,1:10000), ...
+contourf(xGrid(:,1:15000), tGrid(:,1:15000), 1e-6 * new.pAll(:,1:15000), ...
     'LevelStep', 0.2);
 
 xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
 ylabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14)
+cbh = colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14, ...
+    'location', 'westoutside');
+ylabel(cbh, '$p$ [MPa]', 'FontSize', 14, 'Interpreter', 'latex')
 colormap cool
 set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on')
+% set(gca, 'position', [0.30, 0.13, 0.45, 0.8])
 
 % Plot tracker line for next figure
 tIndexSample = 5000;
@@ -342,7 +347,51 @@ hold on
 plot([new.x(1) new.x(end)], new.t(5000)*[1 1], ...
     'Color', colorTrackerLine, 'LineWidth', 0.5)
 hold off
+ylimCurrent = ylim;
 
+% Shuttle position attachment
+subplot(1,2,2);
+% plot(new.shuttle_position, new.t, 'k', 'LineWidth', 1)
+
+% Dummy lines for legend
+for i = 1:6
+    plot(new.shuttle_position(1), new.t(1), [caseKeyContext.colorMap{i}, '-'])
+    hold on
+end
+for i = 1:length(caseKeyContext.caseKeySwitchIndices)-1
+    % Include the right boundary element too for continuity
+    plotRange = caseKeyContext.caseKeySwitchIndices(i)+1: ...
+        caseKeyContext.caseKeySwitchIndices(i+1)+1;
+    plot(new.shuttle_position(plotRange), new.t(plotRange), ...
+        [caseKeyContext.colorMap{1+caseKeyContext.caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
+    hold on
+end
+hold off
+
+legendLabels = {'Closed', ...
+    'Subsonic', ...
+    'Port choked', ...
+    'Chamber choked', ...
+    'Chamber choked*', ...
+    'Relaxation'};
+legend(legendLabels, 'Interpreter', 'latex', 'location', 'eastoutside', ...
+    'FontSize', 10)
+
+set(gca, 'YTickLabel', {'','','','',''}, ...
+    'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+% Sync vertical axis
+ylim([0, ylimCurrent(2)])
+% set(gca, 'position', [0.76, 0.13, 0.15, 0.8])
+xlabel('$\xi$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+
+% Resize axes
+subplot(1,2,2);
+set(gca, 'position', [0.68, 0.13, 0.15, 0.8])
+subplot(1,2,1);
+set(gca, 'position', [0.2, 0.13, 0.45, 0.8])
+
+% Plot slice figure
 figure(12); clf;
 plot(new.x, 1e-6*new.pAll(:,5000), 'Color', colorTrackerLine, 'LineWidth', 1);
 xlabel('$x$ [m]', 'Interpreter', 'latex', 'FontSize', 17)
@@ -351,10 +400,12 @@ set(gca, 'FontSize', 15, 'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on')
 ylimCurrent = ylim;
 ylim([0, ylimCurrent(2)])
-xlim([new.x(1), 0]);
+% xlim([new.x(1), 0]);
+xlimContours = xlim;
+
 return
 
-%% Analogue figure no-shuttle Pressure contours in x-t plot @ near time
+%% Figure no-shuttle Pressure contours in x-t plot @ near time
 figure(111); clf;
 newUncoupled.t = 1e3*[fullStateUncoupled.t];
 % TODO: check metadata comes from the same source

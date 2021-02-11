@@ -17,8 +17,9 @@ VDotDotFn = @(t) 4*pi*(...
     2*RFn(t) .* RDotFn(t).^2 ...
     + RFn(t).^2 .* RDotDotFn(t));
 
-r1 = 6; % Direct APPROX
-r2 = norm([2*depth, r]);% Ghost trig APPROX
+% Using r as lateral distance
+r1 = norm([r, depth-9]);
+r2 = norm([r, depth+9]);% Ghost trig APPROX
 
 pressureDirect = @(t) rho_inf / (4*pi) * ...
     (VDotDotFn(t - r1/c_inf) / r1 );

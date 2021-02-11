@@ -1,4 +1,5 @@
-function gridFullStates = airgunShuttlePostprocess(solution, metadata, gridFullStates)
+function [gridFullStates, caseKeyContext] = airgunShuttlePostprocess( ...
+    solution, metadata, gridFullStates)
 if nargin == 3
     % Full states already computed
     requireStateComputation = false;
@@ -64,6 +65,11 @@ if metadata.usingShuttleModel
         length(caseKeyHistory)-1)];
     colorMap = {'k', 'g', 'b', 'm', 'r', 'c'};
 
+    % Export caseKeySwitch context
+    caseKeyContext.caseKeySwitchIndices = caseKeySwitchIndices;
+    caseKeyContext.caseKeyHistory = caseKeyHistory;
+    caseKeyContext.colorMap = colorMap;
+    
     subPlotHandle2 = subplot(2,3,2);
     % Dummy lines for legend
     for i = 1:6
