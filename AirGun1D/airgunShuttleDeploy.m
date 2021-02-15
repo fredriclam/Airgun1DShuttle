@@ -1,8 +1,13 @@
 % 
-function [solution, metadata] = airgunShuttleDeploy(nx, coupleToShuttle)
+function [solution, metadata] = airgunShuttleDeploy(nx, coupleToShuttle, options)
 if nargin == 1
     % Default: include shuttle model
     coupleToShuttle = true;
+end
+if nargin >= 3
+    useOverrideOptions = true;
+else
+    useOverrideOptions = false;
 end
 
 addpath .\FlowRelations
@@ -25,24 +30,19 @@ airgunPressure = 1000;                            % Initial pressure in airgun [
 %% Set firing chamber parameters
 airgunVolume = 20600;                             % Volume of airgun [cui]
 airgunInnerDiameter = 10.0;                     % Inner diameter of airgun [in]
-airgunCrossSecArea = pi*airgunInnerDiameter^2/4;  % Firing chamber cross-sectional area [in^2]
-airgunLength = airgunVolume / ...
-    airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
 % Function prescribing firing chamber profile for future implementation
 % Not used in current version.
 airgunFiringChamberProfile = @(x) error(...
     'Not implemented. Placeholder for firing chamber profile function.');
 
 %% Set mid chamber operation mode
-% midChamberMode = 'limit-vented';
-midChamberMode = 'limit-closed';
+midChamberMode = 'limit-vented';
+% midChamberMode = 'limit-closed';
 
 %% Set port parameters
-airgunPortAreaRatio = 0.5;                        % Portion of lateral area covered by port [-]
+airgunPortAreaRatio = 110/180;                        % Portion of lateral area covered by port [-]
 airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
 airgunPortLength = 2.5;                           % Length of port [in]
-airgunPortArea = airgunPortAreaRatio * ...
-    pi * airgunOuterDiameter * airgunPortLength;  % Effective port area [in^2]
 % Shuttle parameters
 shuttleBdryPenaltyStrength = 1e11;                % Linear elastic penalty term for shuttle [N/m]
 
@@ -55,12 +55,28 @@ airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
     + (xi - accelerationLength > 0) * ...
     (airCushionLength / (airCushionLength - (xi - accelerationLength)));
 
+%% Evaluate options
+if useOverrideOptions
+    optionsKeys = fields(options);
+    for i = 1:length(optionsKeys)
+        key = optionsKeys{i};
+        eval(sprintf('%s = options.(key);', key))
+    end
+end
+
+%% Compute dependent parameters
+airgunCrossSecArea = pi*airgunInnerDiameter^2/4;  % Firing chamber cross-sectional area [in^2]
+airgunLength = airgunVolume / ...
+    airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
+airgunPortArea = airgunPortAreaRatio * ...
+    pi * airgunOuterDiameter * airgunPortLength;  % Effective port area [in^2]
+
 %% Housekeeping: Data packing
 paramAirgun = struct(...
     'airgunPressure', airgunPressure, ...
     'airgunLength', airgunLength, ...
-    'airgunCrossSecArea', airgunCrossSecArea, ...
-    'airgunPortArea', airgunPortArea, ....
+    'airgunCrossSecAreaSqInch', airgunCrossSecArea, ...
+    'airgunPortAreaSqInch', airgunPortArea, ....
     'airgunDepth', airgunDepth, ...
     'airgunFiringChamberProfile', airgunFiringChamberProfile, ...
     'airgunOperatingChamberProfile', airgunOperatingChamberProfile, ...
