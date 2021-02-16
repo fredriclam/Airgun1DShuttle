@@ -203,8 +203,8 @@ modelPressureSignalDoubleRate = pressureSignalsDoubleRate{2};
 % solution = savedResultsMidOpen{length(savedResultsMidOpen)}{1};
 % metadata = savedResultsMidOpen{length(savedResultsMidOpen)}{2};
 
-solution = savedResultsDoubleRate{1}{1};
-metadata = savedResultsDoubleRate{1}{2};
+solution = savedResultsMidClosed{4}{1};
+metadata = savedResultsMidClosed{4}{2};
 
 if ~exist('fullStateBest','var')
     [fullStateBest, caseKeyContext] = ...
@@ -236,15 +236,107 @@ plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.m');
 hold off
 
 legend({...
-    '$T_\mathrm{L}$ mid-open', ...
-    '$T_\mathrm{L}$ mid-closed', ...
-    '$T_\mathrm{L}$ no-shuttle 100 ms', ...
-    '$T_\mathrm{L}$ double damping rate', ...
+    'mid-open', ...
+    'mid-closed', ...
+    'no-shuttle 100 ms', ...
+    'mid-closed $2\times$ op chamber flow rate', ...
     'Data (9m depth hydrophone)'}, ...
     'Interpreter', 'latex', 'FontSize', 13)
 grid on
 grid minor
 
+%% Compare Received Signal II
+figure(139); clf;
+
+plot(1e3*tSample, pressureSignalsMidClosed{1}, '-k', 'LineWidth', 1)
+hold on
+plot(1e3*tSample, pressureSignalsMidClosed{2}, '-b', 'LineWidth', 1)
+plot(1e3*tSample, pressureSignalsMidClosed{3}, '-r', 'LineWidth', 1)
+plot(1e3*tSample, pressureSignalsMidClosed{4}, '-g', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+dataDAQ = HiTestData(25).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.m');
+hold off
+
+legend({...
+    'mid-closed 61.1\% coverage', ...
+    'mid-closed 50\% coverage', ...
+    'mid-closed 40\% coverage', ...
+    'mid-closed 30\% coverage', ...
+    'Data (9m depth hydrophone)'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+%% Compare Received Signal III
+figure(138); clf;
+
+plot(1e3*tSample, pressureSignalsMidClosed{1}, '-k', 'LineWidth', 1)
+hold on
+plot(1e3*tSample, pressureSignalsMidClosed{5}, '-b', 'LineWidth', 1)
+plot(1e3*tSample, pressureSignalsMidClosed{6}, '-r', 'LineWidth', 1)
+% plot(1e3*tSample, pressureSignalsMidClosed{4}, '-g', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+dataDAQ = HiTestData(25).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.m');
+hold off
+
+legend({...
+    'mid-closed 61.1\% coverage', ...
+    'mid-closed 140\% coverage', ...
+    'mid-closed 200\% coverage', ...
+    'Data (9m depth hydrophone)'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+%% Compare Received Signal IV
+figure(138); clf;
+
+plot(1e3*tSample, pressureSignalsDoubleRate{2}, '-k', 'LineWidth', 1)
+hold on
+plot(1e3*tSample, pressureSignalsDoubleRate{3}, '-r', 'LineWidth', 1)
+% plot(1e3*tSample, pressureSignalsMidClosed{6}, '-r', 'LineWidth', 1)
+% plot(1e3*tSample, pressureSignalsMidClosed{4}, '-g', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+
+dataDAQ = HiTestData(25).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.m');
+hold off
+
+legend({...
+    'mid-closed 61.1\% coverage, $2 \times$ op cham. flow rate, bubble 600 cui', ...
+    'mid-closed 61.1\% coverage, $2 \times$ op cham. flow rate, bubble 60 cui', ...
+    'Data (9m depth hydrophone)'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
 
 %% Compare far-field pressures and bubble states
 figure(141); clf;

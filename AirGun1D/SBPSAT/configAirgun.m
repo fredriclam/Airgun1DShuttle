@@ -2,7 +2,7 @@ function [physConst, t0, icAirgun, icBubble] = configAirgun(str, ...
     airgunPressure,airgunLength,airgunPortArea,airgunDepth, ...
     airgunCrossSectionalArea, airgunFiringChamberProfile, ...
     airgunOperatingChamberProfile, bubbleInitialVolume, ...
-    shuttleBdryPenaltyStrength)
+    shuttleBdryPenaltyStrength, airgunPortLength)
 
 % Set defaults for last arguments backward compatibility
 if nargin == 5
@@ -10,7 +10,7 @@ if nargin == 5
         error(['Invalid number of input arguments for' ...
                'GeneralAirgun setting.']);
     end
-elseif nargin < 5 || nargin ~= 10
+elseif nargin < 5 || nargin ~= 11
     error('Invalid number of input arguments.')
 end
 
@@ -205,16 +205,18 @@ switch str
             (11.1 * 0.0254)^2 - (2.1 * 0.0254)^2); % [m^2]
         
         % Lead-in length where shuttle can move without exposing the air
-        physConst.portLead = 0.35 * 0.0254; % [m]
+        physConst.portLead = 0 * 0.35 * 0.0254; % [m] -- CHANGED
         
         physConst.flangeDepth = 3 * 0.0254; % [m]
-        % Approximate the flage ID to be equal to the chamber
+        % Approximate the flange ID to be equal to the chamber
         physConst.plugVolumeFn = @(xi) ...
             physConst.crossSectionalArea * (xi + physConst.flangeDepth);
 
         % Set shuttle penalty parameter
         % Note: ~1e11 makes sense based on linear elasticity
         physConst.shuttleBdryPenaltyStrength = shuttleBdryPenaltyStrength;
+        
+        physConst.airgunPortLength = airgunPortLength;
         
     otherwise
         error();

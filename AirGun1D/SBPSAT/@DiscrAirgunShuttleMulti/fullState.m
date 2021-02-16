@@ -241,9 +241,18 @@ else
     % Approximate the total port length as the full travel of
     % the shuttle: the % of the travel is thus the % of the
     % full port area that is exposed
-    APortExposed = max([0, obj.physConst.APortTotal * ...
-        (shuttle(1) - obj.physConst.portLead) / ...
-        (obj.physConst.operatingChamberLength - obj.physConst.portLead)]);
+%     APortExposed = max([0, obj.physConst.APortTotal * ...
+%         (shuttle(1) - obj.physConst.portLead) / ...
+%         (obj.physConst.operatingChamberLength - obj.physConst.portLead)]);
+
+    % Appoximate exposed port area as
+    %   xi - portLead
+    % times the effective outer diameter
+    APortExposed = (shuttle(1) - obj.physConst.portLead) ...
+        / obj.physConst.airgunPortLength ...
+        * obj.physConst.APortTotal;
+    % Clamp to [0, APortTotal]
+    APortExposed = min([max([0, APortExposed]), obj.physConst.APortTotal]);
     
     % Compute initial q from q_R such that M_R as <= 1
     if M_R > 1
