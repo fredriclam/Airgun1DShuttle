@@ -36,24 +36,27 @@ airgunFiringChamberProfile = @(x) error(...
     'Not implemented. Placeholder for firing chamber profile function.');
 
 %% Set mid chamber operation mode
-midChamberMode = 'limit-vented';
-% midChamberMode = 'limit-closed';
+% midChamberMode = 'limit-vented';
+midChamberMode = 'limit-closed';
 
 %% Set port parameters
 airgunPortAreaRatio = 110/180;                        % Portion of lateral area covered by port [-]
 airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
-airgunPortLength = 2.5;                           % Length of port [in]
+airgunPortLength = 2.375;                           % Length of port [in]
 % Shuttle parameters
 shuttleBdryPenaltyStrength = 1e11;                % Linear elastic penalty term for shuttle [N/m]
 
 %% Set operating chamber specifications
-airCushionLength = 0.542*0.0254;                  % Length of closed air cushioning effect [m]
-accelerationLength = (3.009-0.542)*0.0254;        % Length over which shuttle accelerates freely [m]
+% Deprecated -- shouldn't be used. Specs taken from discretization >
+% Chambers object instead
+% airCushionLength = 0.542*0.0254;                  % Length of closed air cushioning effect [m]
+% accelerationLength = (2.6875-0.542)*0.0254; % (3.009-0.542)*0.0254;        % Length over which shuttle accelerates freely [m]
 
 % Compression factor of air cushion as function of shuttle position
-airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
-    + (xi - accelerationLength > 0) * ...
-    (airCushionLength / (airCushionLength - (xi - accelerationLength)));
+% airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
+%     + (xi - accelerationLength > 0) * ...
+%     (airCushionLength / (airCushionLength - (xi - accelerationLength)));
+airgunOperatingChamberProfile = @() error('Legacy argument used');
 
 %% Evaluate options
 if useOverrideOptions

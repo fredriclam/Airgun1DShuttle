@@ -66,7 +66,7 @@ elseif strcmpi('limit-closed', chamberSet.midChamberMode)
     p_Mid = p0_Mid * (midChamberLength / ...
             (midChamberLength-z(1)))^physConst.gamma;
 else
-    warning('Mid chamber mode unset')
+    error('Mid chamber mode unset')
 end
 
 % Define local aliases
@@ -90,7 +90,7 @@ else
     TMax = T_front;
 end
 
-flowL2R = ...
+flowL2R = ... 
     flowSignL2R * chamberSet.gapArea(z(1)) * M * ...
     sqrt(g * pMax * rhoMax) * ...
     (1 + (g-1)/2 * M^2)^(0.5*(-g-1)/(g-1));

@@ -56,8 +56,8 @@ addpath .\SBPSAT
 addpath ..\sbplib
 
 % portAreaRatioVector = 0.6:0.1:1.4;
-portAreaRatioVector = [0.5, 0.6111, 0.8, 0.9, 1.0, 1.1, 1.4, 2.0];
-portAreaRatioVectorShort = [0.6111, 1.1, 2.0];
+portAreaRatioVector = [0.6111, 0.5, 0.4, 0.3, 1.4, 2.0];
+portAreaRatioVectorShort = [0.6111, 0.5, 1.1, 2.0];
 
 % Background process or parallel (requires O(10 GB) per thread)
 pool = gcp('nocreate');
@@ -69,21 +69,21 @@ for i = 1:length(portAreaRatioVector)
     portAreaRatio = portAreaRatioVector(i);
     
     % Call function [solution, metadata] = airgunShuttleDeploy(nx)
-    futuresMidOpen(i) = parfeval(pool, @airgunShuttleDeploy, 2, 40, true, ...
+    futuresMidClosed(i) = parfeval(pool, @airgunShuttleDeploy, 2, 40, true, ...
         struct('airgunPortAreaRatio', portAreaRatio));
 end
 
 %% Collect data
 % Use separate variable names for smaller variables
 % Manually specify usable data range
-for i = 1:8
+for i = 1:6
 %     eval(sprintf('savedResults{%d} = futures(%d).OutputArguments', i, i));
-    savedResultsMidOpen{i} = futuresMidOpen(i).OutputArguments;
+    savedResultsMidClosed{i} = futuresMidClosed(i).OutputArguments;
 %     eval(sprintf("save('session-%d', 'savedResults%d', '-v7.3')", i, i));
 end
 
 %% Clear on collection
-clear futuresMidOpen
+clear futuresMidClosed
 
 %% Part 2 Runs
 
@@ -91,9 +91,9 @@ for i = 1:length(portAreaRatioVectorShort)
     portAreaRatio = portAreaRatioVectorShort(i);
     
     % Call function [solution, metadata] = airgunShuttleDeploy(nx)
-    futuresMidClosed(i) = parfeval(pool, @airgunShuttleDeploy, 2, 40, true, ...
+    futuresMidOpen(i) = parfeval(pool, @airgunShuttleDeploy, 2, 40, true, ...
         struct('airgunPortAreaRatio', portAreaRatio, ...
-        'midChamberMode', 'limit-closed'));
+        'midChamberMode', 'limit-vented'));
 end
 
 for i = 1:length(portAreaRatioVectorShort)
@@ -106,25 +106,25 @@ end
 
 %% Collect data
 
-for i = 1:3
-    savedResultsMidClosed{i} = futuresMidClosed(i).OutputArguments;
+for i = 1:4
+    savedResultsMidOpen{i} = futuresMidOpen(i).OutputArguments;
 end
 
-for i = 1:3
+for i = 1:4
     savedResultsUncoupled{i} = futuresUncoupled(i).OutputArguments;
 end
 
 %% Clear on collection
-clear savedResultsMidClosed
-clear savedResultsUncoupled
+clear futuresMidOpen
+clear futuresUncoupled
 
 %% Pick representative results
 % solution = savedResults{length(savedResults)}{1};
 % metadata = savedResults{length(savedResults)}{2};
 % solution = savedResultsMidOpen{2}{1};
 % metadata = savedResultsMidOpen{2}{2};
-solution = savedResultsMidClosed{1}{1};
-metadata = savedResultsMidClosed{1}{2};
+solution = savedResultsMidClosed{2}{1};
+metadata = savedResultsMidClosed{2}{2};
 
 %% Postprocess result
 if ~exist('fullStateBest','var')
@@ -187,20 +187,25 @@ for i = 1:length(savedResultsMidOpen)
     pressureSignalsMidOpen{i} = pressureSignalFnMidOpen(tSample);
 end
 
-for i = 1:length(savedResultsMidClosed)
+for i = 1:length(savedResultsUncoupled)
     pressureSignalFnUncoupled = airgunShuttleSignature(savedResultsUncoupled{i}{1}, ...
         savedResultsUncoupled{i}{2});
     pressureSignalsUncoupled{i} = pressureSignalFnUncoupled(tSample);
 end
 
 %% Select model signals
-modelPressureSignalMidOpen = pressureSignalsMidOpen{2};
+modelPressureSignalMidOpen = pressureSignalsMidOpen{1};
 modelPressureSignalMidClosed = pressureSignalsMidClosed{1};
 modelPressureSignalUncoupled = pressureSignalsUncoupled{1};
+modelPressureSignalDoubleRate = pressureSignalsDoubleRate{2};
 
 %% Postprocess result
-solution = savedResultsMidOpen{length(savedResultsMidOpen)}{1};
-metadata = savedResultsMidOpen{length(savedResultsMidOpen)}{2};
+% solution = savedResultsMidOpen{length(savedResultsMidOpen)}{1};
+% metadata = savedResultsMidOpen{length(savedResultsMidOpen)}{2};
+
+solution = savedResultsDoubleRate{1}{1};
+metadata = savedResultsDoubleRate{1}{2};
+
 if ~exist('fullStateBest','var')
     [fullStateBest, caseKeyContext] = ...
         airgunShuttlePostprocess(solution, metadata);
@@ -215,6 +220,7 @@ plot(1e3*tSample, modelPressureSignalMidOpen, '-k', 'LineWidth', 1)
 hold on
 plot(1e3*tSample, modelPressureSignalMidClosed, '-b', 'LineWidth', 1)
 plot(1e3*tSample, modelPressureSignalUncoupled, '-r', 'LineWidth', 1)
+plot(1e3*tSample, modelPressureSignalDoubleRate, '-g', 'LineWidth', 1)
 hold off
 xlim([0, 500]);
 xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
@@ -226,13 +232,14 @@ timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
 hold on
 DAQGain = 8;
 DAQSens = 1e5/7.6; % Pa per V
-plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.');
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.m');
 hold off
 
 legend({...
     '$T_\mathrm{L}$ mid-open', ...
     '$T_\mathrm{L}$ mid-closed', ...
     '$T_\mathrm{L}$ no-shuttle 100 ms', ...
+    '$T_\mathrm{L}$ double damping rate', ...
     'Data (9m depth hydrophone)'}, ...
     'Interpreter', 'latex', 'FontSize', 13)
 grid on
@@ -243,7 +250,7 @@ grid minor
 figure(141); clf;
 
 % Select model signal
-modelPressureSignalMidOpen = pressureSignalsMidOpen{2};
+modelPressureSignalMidOpen = pressureSignalsMidOpen{1};
 modelPressureSignalMidClosed = pressureSignalsMidClosed{1};
 modelPressureSignalUncoupled = pressureSignalsUncoupled{1};
 
@@ -425,12 +432,12 @@ plot(1000*[fullStateBest.t], ...
     new.T_L, ...
     'k-', 'LineWidth', 1);
 
-newUncoupled.eDS = [fullStateUncoupled.eulerDomainStates];
-newUncoupled.TAll = [newUncoupled.eDS.T];
-newUncoupled.T_L = [newUncoupled.TAll(1,:)];
-plot(1000*[fullStateUncoupled.t], ...
-    newUncoupled.T_L, ...
-    'r-', 'LineWidth', 1);
+% newUncoupled.eDS = [fullStateUncoupled.eulerDomainStates];
+% newUncoupled.TAll = [newUncoupled.eDS.T];
+% newUncoupled.T_L = [newUncoupled.TAll(1,:)];
+% plot(1000*[fullStateUncoupled.t], ...
+%     newUncoupled.T_L, ...
+%     'r-', 'LineWidth', 1);
 hold off
 
 legend({'Data (TC 005 at end)', '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
@@ -478,11 +485,13 @@ set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on')
 
 %% Mass analysis
-analysis_solution = savedResultsUncoupled{2}{1};
-analysis_metadata = savedResultsUncoupled{2}{2};
+% analysis_solution = savedResultsUncoupled{2}{1};
+% analysis_metadata = savedResultsUncoupled{2}{2};
+analysis_solution = solution;
+analysis_metadata = metadata;
 
 massAirgun = sum(analysis_solution.q(1:3:end,:) ...
-    * analysis_metadata.paramAirgun.airgunCrossSecAreaSqInch * 0.0254^2 * 0.681 * 1.462 ...
+    * analysis_metadata.paramAirgun.airgunCrossSecAreaSqInch * 0.0254^2 ...
     * analysis_metadata.discretization.schm.h);
 massBubble = analysis_solution.bubble(3,:);
 figure(902); clf;
@@ -505,6 +514,8 @@ subplot(1,3,1);
 plot(1e-6*new.p_L, 1000*[fullStateBest.t], 'k-', 'LineWidth', 1);
 hold on
 try
+    psiPa_conversion = 6894.75729;
+    nominalminimum = 1000*psiPa_conversion; % Voltage baseline at 0 psi
     begin_index = 3695*5;
     end_index = begin_index+1600*5;
     plot(1e-6* (nominalminimum + ...

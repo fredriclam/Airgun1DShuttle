@@ -15,7 +15,7 @@ classdef Chambers
         function obj = Chambers(midChamberMode)
             %% Set data for operating chamber
             % Pistom diameter [m]
-            obj.piston_diam = 11.1 * 0.0254;
+            obj.piston_diam = 11.2 * 0.0254;
             % Shuttle area in the operating chamber, front [m^2]
             obj.shuttle_area_right_front = pi/4 * ( ...
                 obj.piston_diam^2);
@@ -24,7 +24,7 @@ classdef Chambers
             obj.shuttle_area_right_rear = pi/4 * ( ...
                 obj.piston_diam^2 - (2.1 * 0.0254)^2); %
             % Total travel length of the shuttle [m]
-            obj.total_travel_length = 3.009 * 0.0254;
+            obj.total_travel_length = 2.6875 * 0.0254; % 3.009 * 0.0254;
             
             % Compute constrained geometric parameters
             obj.totalVolume = obj.rearVolume(obj.total_travel_length);
@@ -53,7 +53,7 @@ classdef Chambers
         
         % Visualize the chambers with piston position
         function obj = visualize(obj, xi)
-            error('WIP');
+            % WIP
             obj.visualizeStatic();
         end
          

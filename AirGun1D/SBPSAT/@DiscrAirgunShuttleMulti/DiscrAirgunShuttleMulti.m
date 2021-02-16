@@ -39,7 +39,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             obj.chambers = Chambers(midChamberMode);
             
             % Add additional configuration with backward-compatible setting
-                [physConst, ~, ~, ~] = ...
+                [physConst, ~, ~, icBubble] = ...
                     configAirgun(...
                         'GeneralAirgun', ...
                         airgunPressure, ...
@@ -108,6 +108,13 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             %% Bubble
             % Freeze bubble until the port first opens (xi >= xi_t)
             obj.bubbleFrozen = true;
+            % Replace bubble using provided parameters
+            obj.bubble0 = [
+                icBubble.R;
+                icBubble.Rdot;
+                icBubble.m;
+                icBubble.E;
+            ];
 
             %% Create boundary condition operators
             % Wall BC
