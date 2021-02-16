@@ -32,6 +32,10 @@ if requireStateComputation
     disp('State functions computed. Plotting and returning state.')
 end
 
+% Compute theoretical max area
+ARatioMax = metadata.paramAirgun.airgunPortAreaSqInch / ...
+    metadata.paramAirgun.airgunCrossSecAreaSqInch;
+
 %% Figure 1: Phase plot
 eDS = [gridFullStates.eulerDomainStates];
 pS = [gridFullStates.portStates];
@@ -89,6 +93,8 @@ if metadata.usingShuttleModel
 
     plot(pRatioHat(1), ARatio(1), 'k.', 'MarkerSize', 24)
     text(pRatioHat(1),0.05,'Start')
+    
+    plot(0, ARatioMax, '-')
     hold off
 
     legendLabels = {'Closed', ...
@@ -118,6 +124,7 @@ if metadata.usingShuttleModel
     text(MHatHistory(1),0.05,'Start')
     hold on
     plot(MHatHistory, ARatio, 'k', 'LineWidth', 1)
+    plot(0, ARatioMax, '-')
     hold off
     xlabel ('$\hat{M}$', 'Interpreter', 'latex', 'FontSize', 18)
     ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
@@ -178,6 +185,9 @@ set(gca, ...
 
 subPlotHandle1 = subplot(2,3,1);
 plot(1e3*solution.soln.x, ARatio, 'k', 'LineWidth', 1)
+hold on
+plot(1e3*solution.soln.x, ARatioMax*ones(size(ARatio)), 'k', 'LineWidth', 1)
+hold off
 xlabel ('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 18)
 ylabel ('$A_\mathrm{port}/A_\mathrm{cs}$', 'Interpreter', 'latex', 'FontSize', 18)
 set(gca, ...

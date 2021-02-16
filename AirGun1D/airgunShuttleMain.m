@@ -119,8 +119,12 @@ clear savedResultsMidClosed
 clear savedResultsUncoupled
 
 %% Pick representative results
-solution = savedResults{length(savedResults)}{1};
-metadata = savedResults{length(savedResults)}{2};
+% solution = savedResults{length(savedResults)}{1};
+% metadata = savedResults{length(savedResults)}{2};
+% solution = savedResultsMidOpen{2}{1};
+% metadata = savedResultsMidOpen{2}{2};
+solution = savedResultsMidClosed{1}{1};
+metadata = savedResultsMidClosed{1}{2};
 
 %% Postprocess result
 if ~exist('fullStateBest','var')
@@ -130,7 +134,7 @@ else
     airgunShuttlePostprocess(solution, metadata, fullStateBest);
 end
 
-pressureSignalFnBest = airgunShuttleSignature(solution,metadata);
+% pressureSignalFnBest = airgunShuttleSignature(solution,metadata);
 
 %% Work with uncoupled model
 
@@ -189,13 +193,23 @@ for i = 1:length(savedResultsMidClosed)
     pressureSignalsUncoupled{i} = pressureSignalFnUncoupled(tSample);
 end
 
-%% Compare Received Signal
-figure(140); clf;
-
-% Select model signal
-modelPressureSignalMidOpen = pressureSignalsMidOpen{1};
+%% Select model signals
+modelPressureSignalMidOpen = pressureSignalsMidOpen{2};
 modelPressureSignalMidClosed = pressureSignalsMidClosed{1};
 modelPressureSignalUncoupled = pressureSignalsUncoupled{1};
+
+%% Postprocess result
+solution = savedResultsMidOpen{length(savedResultsMidOpen)}{1};
+metadata = savedResultsMidOpen{length(savedResultsMidOpen)}{2};
+if ~exist('fullStateBest','var')
+    [fullStateBest, caseKeyContext] = ...
+        airgunShuttlePostprocess(solution, metadata);
+else
+    airgunShuttlePostprocess(solution, metadata, fullStateBest);
+end
+
+%% Compare Received Signal
+figure(140); clf;
 
 plot(1e3*tSample, modelPressureSignalMidOpen, '-k', 'LineWidth', 1)
 hold on
@@ -463,20 +477,36 @@ legend({'Data', 'Model $p_\mathrm{L}$', 'Model $p_\mathrm{L}$ no-shuttle 100 ms'
 set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on')
 
+%% Mass analysis
+analysis_solution = savedResultsUncoupled{2}{1};
+analysis_metadata = savedResultsUncoupled{2}{2};
+
+massAirgun = sum(analysis_solution.q(1:3:end,:) ...
+    * analysis_metadata.paramAirgun.airgunCrossSecAreaSqInch * 0.0254^2 * 0.681 * 1.462 ...
+    * analysis_metadata.discretization.schm.h);
+massBubble = analysis_solution.bubble(3,:);
+figure(902); clf;
+plot(analysis_solution.soln.x, massAirgun, 'r')
+hold on
+plot(analysis_solution.soln.x, massBubble, 'b')
+plot(analysis_solution.soln.x, massAirgun + massBubble, 'k')
+hold off
+
 %% Figure: Pressure contours in x-t plot @ near time
-figure(11); clf;
 new.t = 1e3*[fullStateBest.t];
 % TODO: check metadata comes from the same source
 new.x = linspace(metadata.discretization.schm.u(1), ...
     metadata.discretization.schm.u(end), size(new.pAll,1));
 
-%%
+%% Pressure contours
 figure(11); clf;
 
 subplot(1,3,1);
 plot(1e-6*new.p_L, 1000*[fullStateBest.t], 'k-', 'LineWidth', 1);
 hold on
 try
+    begin_index = 3695*5;
+    end_index = begin_index+1600*5;
     plot(1e-6* (nominalminimum + ...
     psiPa_conversion*HiTestData(24).iNetCh16Data(begin_index:end_index)), ...
     1000*(HiTestData(24).iNetTimeAxisP(begin_index:end_index) - ...
