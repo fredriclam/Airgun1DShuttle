@@ -248,8 +248,9 @@ else
     % Appoximate exposed port area as
     %   xi - portLead
     % times the effective outer diameter
+    obj.physConst.airgunPortLength = 2.375;
     APortExposed = (shuttle(1) - obj.physConst.portLead) ...
-        / obj.physConst.airgunPortLength ...
+        / (0.0254*obj.physConst.airgunPortLength) ...
         * obj.physConst.APortTotal;
     % Clamp to [0, APortTotal]
     APortExposed = min([max([0, APortExposed]), obj.physConst.APortTotal]);

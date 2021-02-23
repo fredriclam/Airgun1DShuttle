@@ -40,7 +40,7 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     %b = 10; 
     %alpha = b*abs(Rdot); %abs(Rdot);
     b = 0;
-    alpha=0.8; %b*abs(Rdot); %10;
+    alpha=0.; %b*abs(Rdot); %10;
 %     alpha =0;
     dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
     
