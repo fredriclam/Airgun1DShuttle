@@ -18,10 +18,13 @@ VDotDotFn = @(t) 4*pi*(...
     2*RFn(t) .* RDotFn(t).^2 ...
     + RFn(t).^2 .* RDotDotFn(t));
 
+% Floor depth (ish)
+floorDepth = 28;
+
 % Using r as lateral distance
 r1 = norm([r, depth-9]);
 r2 = norm([r, depth+9]);% Ghost trig APPROX
-r3 = norm([r, 2*20-depth-9]);% Hypothetical
+r3 = norm([r, 2*floorDepth-depth-9]);% Hypothetical
 
 
 % Boolean value for using nonlinear, near-field pressure term

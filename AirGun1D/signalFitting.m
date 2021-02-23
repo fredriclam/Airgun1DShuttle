@@ -4,7 +4,7 @@
 % be row vectors)
 
 % Data preprocessing
-dataWindowIndex = find(timeDAQ>0.050, 1,'first');
+dataWindowIndex = find(timeDAQ>0.016, 1,'first');
 timeToFit = timeDAQ(1:dataWindowIndex)';
 pressureToFit = pressureDAQ(1:dataWindowIndex)';
 
