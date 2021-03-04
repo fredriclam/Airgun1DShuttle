@@ -3,6 +3,14 @@
 % Assuming referenceSignalFn, timeDAQ, pressureDAQ defined (latter should
 % be row vectors)
 
+% Hydrophone 3
+dataDAQ = HiTestData(25).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.');
+
 % Data preprocessing
 dataWindowIndex = find(timeDAQ>0.016, 1,'first');
 timeToFit = timeDAQ(1:dataWindowIndex)';

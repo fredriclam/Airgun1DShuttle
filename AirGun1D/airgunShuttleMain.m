@@ -643,7 +643,7 @@ colorTrackerLine = [252, 111, 23]/255;
 hold on
 plot([new.x(1) new.x(end)], new.t(5000)*[1 1], ...
     'Color', colorTrackerLine, 'LineWidth', 0.5)
-hold off
+hold off 
 ylimCurrent = ylim;
 
 % Shuttle position attachment

@@ -6,8 +6,6 @@ function [agState, exception] = ...
 % Use within RHS function for ODE and for querying state in
 % post-processing.
 
-% TODO: track #evals of each case
-
 exception = [];
 
 if nargin <= 6
@@ -68,9 +66,6 @@ mapq2characteristics = @(q) obj.schm.T(q) \ q;
 %% Create empty note string
 noteString = "";
 
-% % Default value
-% qPort = q_R;
-
 %% Define function in scope of fullState
 % Functions that handle boundary cases, capturing the local workspace
 function [qPort, exitFlag] = processSubsonicCase(qIn)
@@ -109,6 +104,7 @@ function [qPort, exitFlag] = processSubsonicCase(qIn)
 end
 
 function [qPort, exitFlag] = processPortChokedCase(qIn)
+    % Composed map: MPort = 1 -> A_port/A* -> M_R
     [MPort, exception]...
         = mapChokedPortAreaRatioToM(obj, APortExposed);
 

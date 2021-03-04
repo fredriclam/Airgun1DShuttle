@@ -2,9 +2,18 @@
 % Wave propagation model
 
 function [pressureSignalFnTotal, tInterp, pressureSignal] = ...
-    airgunShuttleSignature(solution, metadata)
+    airgunShuttleSignature(...
+    solution, metadata, hydrophoneDepth, lateralSeparation)
 
-r = 6;           % Distance from source to receiver [m]
+if nargin < 3
+    % Backward compatible default hydrophone depth
+    hydrophoneDepth = 9;
+    lateralSeparation = 6;
+elseif nargin == 3
+    error("Provide both hydrophone depth and lateral separation " + ...
+          "(or neither for default).")
+end
+
 c_inf = 1482;     % Speed of sound in water [m/s]
 rho_inf = 1000;   % Density of water [kg/m^3]
 depth = metadata.paramAirgun.airgunDepth;
@@ -19,12 +28,12 @@ VDotDotFn = @(t) 4*pi*(...
     + RFn(t).^2 .* RDotDotFn(t));
 
 % Floor depth (ish)
-floorDepth = 28;
+floorDepth = 27;
 
 % Using r as lateral distance
-r1 = norm([r, depth-9]);
-r2 = norm([r, depth+9]);% Ghost trig APPROX
-r3 = norm([r, 2*floorDepth-depth-9]);% Hypothetical
+r1 = norm([lateralSeparation, depth-hydrophoneDepth]);
+r2 = norm([lateralSeparation, depth+hydrophoneDepth]);% Ghost trig APPROX
+r3 = norm([lateralSeparation, 2*floorDepth-depth-hydrophoneDepth]);% Hypothetical floor reflect
 
 
 % Boolean value for using nonlinear, near-field pressure term

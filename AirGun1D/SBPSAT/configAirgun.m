@@ -206,6 +206,7 @@ switch str
         
         % Lead-in length where shuttle can move without exposing the air
         physConst.portLead = 0.35 * 0.0254; % [m] -- CHANGE?
+        physConst.portLead = 0.0 * 0.0254; % [m] -- CHANGED
         
         physConst.flangeDepth = 3 * 0.0254; % [m]
         % Approximate the flange ID to be equal to the chamber
