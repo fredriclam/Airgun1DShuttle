@@ -120,11 +120,15 @@ xlim([0 200]);
 %% ~Bubble pressure sensor
 % May indicate that bubble model is crucial in getting more accurate
 % far-field signature.
-figure(69); clf;
-plot(sketch.tData, 1e-6* (...
-psiPa_conversion*HiTestData(24).iNetCh10Data(begin_index:end_index)));
+figure(269); clf;
+plot(sketch.tData(19:end) - sketch.tData(18), 1e-6* (...
+psiPa_conversion*HiTestData(24).iNetCh10Data(18+begin_index:end_index)));
 hold on
-plot(new.t,1e-6*[new.bS.p])
+plot(new.t,1e-6*([new.bS.p]-new.bS(1).p))
+xlabel 't [ms]'
+ylabel 'P [MPa] just outside port (data) or bubble (model)'
+grid minor
+grid on
 
 %% Port inside sensor
 % Untrustworthy: max to min dip in one sampling period. Random artifacts in
@@ -140,3 +144,94 @@ figure(71); clf;
 plot(new.t, [new.pS.massFlowPort]);
 xlabel 't [ms]'
 ylabel '{dm/dt} [kg/s]'
+
+%% All sensors
+figure(241); clf;
+
+% Select model signal
+pressureSignalFnBubble = airgunShuttleSignature(solutionSplitBubble, metadataSplitBubble);
+modelPressureSignal = pressureSignalFnBubble(tSample);
+
+subplot(2,2,1);
+plot(1e3*tSample, modelPressureSignal, '-k', 'LineWidth', 1)
+
+dataDAQ = HiTestData(25).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+hold on
+DAQGain = 8;
+DAQSens = 1e5/7.6; % Pa per V
+plot(1e3*timeDAQ, DAQGain*DAQSens*dataDAQ, '.');
+hold off
+%%
+subplot(2,2,2);
+new.bubbleStates = [solution.bubbleContinuationState];
+newUncoupled.bubbleStates = [solnUncoupled.bubbleContinuationState];
+
+plot(1e3*[solution.bubbleContinuationTime], new.bubbleStates(1,:), ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(1e3*[solnUncoupled.bubbleContinuationTime], newUncoupled.bubbleStates(1,:), '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$R$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13, ...
+    'Location', 'best')
+grid on
+grid minor
+
+subplot(2,2,3);
+plot(1e3*[solution.bubbleContinuationTime], new.bubbleStates(2,:), ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(1e3*[solnUncoupled.bubbleContinuationTime], newUncoupled.bubbleStates(2,:), '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\dot{R}$ [m/s]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+subplot(2,2,4);
+tAxis1 = 1e3*[solution.bubbleContinuationTime];
+tAxis1 = tAxis1(1:end-1);
+RDotDot1 = diff( new.bubbleStates(2,:) ) ./ diff (1e3*[solution.bubbleContinuationTime]);
+
+tAxis2 = 1e3*[solnUncoupled.bubbleContinuationTime];
+tAxis2 = tAxis2(1:end-1);
+RDotDot2 = diff( newUncoupled.bubbleStates(2,:) ) ./ diff (1e3*[solnUncoupled.bubbleContinuationTime]);
+
+plot(tAxis1, RDotDot1, ...
+    '-k', 'LineWidth', 1)
+hold on
+plot(tAxis2, RDotDot2, '-r', 'LineWidth', 1)
+hold off
+xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\ddot{R}$ [m/s${}^2$]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+legend({...
+%     'Data (TC 005 at end)', ...
+    '$T_\mathrm{L}$', '$T_\mathrm{L}$ no-shuttle 100 ms'}, ...
+    'Interpreter', 'latex', 'FontSize', 13)
+grid on
+grid minor
+
+for i = 1:4
+    subplot(2,2,i);
+    xlim([0, 500]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$\Delta p$ [Pa]', 'Interpreter', 'latex', 'FontSize', 14)
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex')
+grid on
+grid minor
+end

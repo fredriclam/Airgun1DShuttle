@@ -17,7 +17,7 @@ return
 
 %% Mass Deploy
 
-% Disable assertion when deploying!
+% Disable assertion on release!
 % File path must be correct (check the following addpath is successful)
 assert(strcmpi(...
     'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
@@ -125,6 +125,31 @@ clear futuresUncoupled
 % metadata = savedResultsMidOpen{2}{2};
 solution = savedResultsMidClosed{2}{1};
 metadata = savedResultsMidClosed{2}{2};
+
+%% [NEW] Varying physical parameters
+
+% Disable assertion when deploying!
+% File path must be correct (check the following addpath is successful)
+assert(strcmpi(...
+    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
+    cd))
+addpath .\FlowRelations
+addpath .\SBPSAT
+addpath ..\sbplib
+
+nx = 40;
+pool = gcp('nocreate');
+if isempty(pool)
+    pool = parpool(2);
+end
+pressureVector = [400, 600, 800, 1000, 1200, 2000]; % psi
+for i = 1:length(pressureVector)
+    airgunPressure = pressureVector(i);
+    
+    % Call function [solution, metadata] = airgunShuttleDeploy(nx)
+    futures(i) = parfeval(pool, @airgunShuttleDeploy, 2, nx, ...
+        true, struct('airgunPressure', airgunPressure));
+end
 
 %% Postprocess result
 if ~exist('fullStateBest','var')

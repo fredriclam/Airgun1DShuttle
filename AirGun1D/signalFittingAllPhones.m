@@ -2,14 +2,19 @@
 
 % Assuming access to solution, metadata, HiTestData
 
-timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
+% timeDAQ = HiTestData(25).headerDAQ.SamplingInterval*(1:length(dataDAQ));
 
 DAQGain = 8;
 DAQSens = 1e5/7.6; % Pa per V
-pressureDAQ6 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(1,1375:15000);
-pressureDAQ12 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(2,1375:15000);
-pressureDAQ3 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(3,1375:15000);
-pressureDAQ9 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(4,1375:15000);
+% pressureDAQ6 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(1,1375:15000);
+% pressureDAQ12 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(2,1375:15000);
+% pressureDAQ3 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(3,1375:15000);
+% pressureDAQ9 = DAQGain*DAQSens*HiTestData(25).entriesDAQ(4,1375:15000);
+pressureDAQ6 = DAQGain*DAQSens*HiTestData(17).entriesDAQ(1,1375:15000);
+pressureDAQ12 = DAQGain*DAQSens*HiTestData(17).entriesDAQ(2,1375:15000);
+pressureDAQ3 = DAQGain*DAQSens*HiTestData(17).entriesDAQ(3,1375:15000);
+pressureDAQ9 = DAQGain*DAQSens*HiTestData(17).entriesDAQ(4,1375:15000);
+timeDAQ = HiTestData(17).headerDAQ.SamplingInterval*(1:length(pressureDAQ6));
 
 pressures{1} = pressureDAQ6;
 pressures{2} = pressureDAQ12;
@@ -26,18 +31,32 @@ labels{2} = '12 m depth';
 labels{3} = '3 m depth';
 labels{4} = '9 m depth';
 
+lateralSeparation = 8;
+
 signalFn{1} = airgunShuttleSignatureTemp(...
-    solution, metadata, 6, 6);
+    solution, metadata, 6, lateralSeparation);
 signalFn{2} = airgunShuttleSignatureTemp(...
-    solution, metadata, 12, 6);
+    solution, metadata, 12, lateralSeparation);
 signalFn{3} = airgunShuttleSignatureTemp(...
-    solution, metadata, 3, 6);
+    solution, metadata, 3, lateralSeparation);
 signalFn{4} = airgunShuttleSignatureTemp(...
-    solution, metadata, 9, 6);
+    solution, metadata, 9, lateralSeparation);
 
 referenceSignalFn = airgunShuttleSignatureTemp(...
-    solution, metadata, 9, 6);
+    solution, metadata, 9, lateralSeparation);
 
+%% Pre-fit plotting
+figure(241); clf
+for i = 1:4
+subplot(2,2,i);
+plot(timeDAQ, signalFn{i}(timeDAQ));
+hold on
+plot(timeDAQ, pressures{i}, '.');
+hold off
+title(labels{i});
+end
+
+%% Fitting
 % Data preprocessing
 dataWindowIndex = find(timeDAQ>0.016, 1,'first');
 timeToFit = timeDAQ(1:dataWindowIndex)';

@@ -13,9 +13,11 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     gama    = physConst.gamma;
     c_inf   = physConst.c_inf;
 
-    p = bubblePressure(y, physConst);
-    V = 4/3*pi*R^3;
-    Vdot = 4*pi*R^2*Rdot;
+    hemisphereFactor = 0.5;
+    
+    V = hemisphereFactor * (4/3*pi*R^3);
+    Vdot = hemisphereFactor * (4*pi*R^2*Rdot);
+    p = E*(gama-1)/V;
 
     kappa=4000;
     M = 10;
@@ -23,7 +25,7 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     T_inf = 273;
     cv=718;
     Tb = E/(cv*m);
-    dQdt = 4*pi*R^2*M*kappa*(Tb-T_inf);
+    dQdt = hemisphereFactor*4*pi*R^2*M*kappa*(Tb-T_inf);
 
     dR = Rdot;
     %dE = A*(e_a + p_a)*v_a - p*Vdot;
@@ -32,7 +34,8 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     % add turbulent mechanical energy dissipation
     C = 0;
     deltaP = C*rho_inf*abs(Rdot)*Rdot;
-    dE = A*(e_a + p_a)*v_a - p*Vdot - dQdt - 4*pi*R^2*Rdot*deltaP;
+    dE = A*(e_a + p_a)*v_a - p*Vdot - dQdt ...
+         - hemisphereFactor*4*pi*R^2*Rdot*deltaP;
 
     dpdt = (gama-1)*(dE*V-Vdot*E)/V^2;
 
@@ -42,7 +45,8 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     b = 0;
     alpha=0.8; %b*abs(Rdot); %10;
 %     alpha =0;
-    dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
+    dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt ...
+        - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
     
     dm = A*rho_a*v_a;
 
