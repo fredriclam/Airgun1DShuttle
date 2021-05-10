@@ -1,6 +1,6 @@
 % All variables without subscripts belong to the bubble.
 % All variables with subscript _a comes from the airgun.
-function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
+function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst, bubbleModel)
     R    = y(1);
     Rdot = y(2);
     m    = y(3);
@@ -13,7 +13,15 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     gama    = physConst.gamma;
     c_inf   = physConst.c_inf;
 
-    hemisphereFactor = 0.5;
+    if strcmpi('quad', bubbleModel)    
+        % Surface area and volume factors for hemisphere
+        hemisphereFactor = 0.5;
+        % Quad bubble rate factor
+        rateFactor = 1/4;
+    elseif strcmpi('single', bubbleModel)
+        hemisphereFactor = 1.0;
+        rateFactor = 1;
+    end
     
     V = hemisphereFactor * (4/3*pi*R^3);
     Vdot = hemisphereFactor * (4*pi*R^2*Rdot);
@@ -34,7 +42,7 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     % add turbulent mechanical energy dissipation
     C = 0;
     deltaP = C*rho_inf*abs(Rdot)*Rdot;
-    dE = A*(e_a + p_a)*v_a - p*Vdot - dQdt ...
+    dE = rateFactor*A*(e_a + p_a)*v_a - p*Vdot - dQdt ...
          - hemisphereFactor*4*pi*R^2*Rdot*deltaP;
 
     dpdt = (gama-1)*(dE*V-Vdot*E)/V^2;
@@ -48,7 +56,7 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst)
     dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt ...
         - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
     
-    dm = A*rho_a*v_a;
+    dm = rateFactor*A*rho_a*v_a;
 
     dy = [dR; dRdot; dm; dE];
 end

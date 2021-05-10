@@ -22,6 +22,9 @@ tspan = [0; 0.200];
 % Set flag for running shuttle-free model
 runShuttleFreeFlag = false;
 
+%% Set bubble model
+bubbleModel = 'single';
+
 %% Set ambient parameters
 airgunDepth = 10;                                 % Depth of airgun [m]
 bubbleInitialVolume = 10;                         % Initial volume [cui] -- changed
@@ -40,7 +43,7 @@ airgunFiringChamberProfile = @(x) error(...
 midChamberMode = 'limit-closed';
 
 %% Set port parameters
-airgunPortAreaRatio = 110/180;                        % Portion of lateral area covered by port [-]
+airgunPortAreaRatio = 0.80; %110/180;                        % Portion of lateral area covered by port [-]
 airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
 airgunPortLength = 2.375;                           % Length of port [in]
 % Shuttle parameters
@@ -86,7 +89,8 @@ paramAirgun = struct(...
     'bubbleInitialVolume', bubbleInitialVolume, ...
     'shuttleBdryPenaltyStrength', shuttleBdryPenaltyStrength, ...
     'midChamberMode', midChamberMode, ...
-    'airgunPortLength', airgunPortLength);
+    'airgunPortLength', airgunPortLength, ...
+    'bubbleModel', bubbleModel);
 % Initialize metadata struct for documenting results
 metadata = struct(...
     'paramAirgun', paramAirgun, ...

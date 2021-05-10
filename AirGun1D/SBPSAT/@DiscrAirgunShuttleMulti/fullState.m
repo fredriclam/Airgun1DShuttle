@@ -103,28 +103,29 @@ function [qPort, exitFlag] = processSubsonicCase(qIn)
         obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
 
-function [qPort, exitFlag] = processPortChokedCase(qIn)
-    % Composed map: MPort = 1 -> A_port/A* -> M_R
-    [MPort, exception]...
+function qHat = processPortChokedCase()
+    gamma = obj.physConst.gamma;
+    % Map MPort = 1 -> A_port/A* -> MTarget
+    [MTarget, exception]...
         = mapChokedPortAreaRatioToM(obj, APortExposed);
 
-    % Mach boundary condition at exit of PDE domain
-    essentialConstraint = @(q) ...
-            mapq2M(q) - MPort;
-
-    [qPort, exitFlag] = ...
-        obj.enforceScalarConstraint(essentialConstraint, qIn);
+    numerator = u_R + 2/(gamma-1)  * c_R;
+    denominator = MTarget * c_R + 2/(gamma-1) * c_R;
+    cHat = numerator / denominator * c_R;
+    uHat = MTarget * cHat;
+    rhoHat = rho_R * (cHat / c_R)^(2/(gamma-1));
+    THat = cHat^2 / gamma / obj.physConst.Q;
+    eHat = (rhoHat * obj.physConst.c_v * THat + 0.5*rhoHat * uHat^2);
+    qHat = [rhoHat;
+            rhoHat * uHat;
+            eHat];
 end
 
 function [qPort, exitFlag] = processChamberChokedCase(qIn)
     % True mach condition M_R = 1
-    % This condition exists if the Euler domain feels it should be
-    % subsonic, but such a setup would result in a subsonic expansion
-    % into the bubble, where the sonic pressure is too high and the
-    % flow would have choked--precisely at the exit of the firing
-    % chamber. This makes sure M_R < 1 is invalid, and corrects the
-    % PDE. This boundary may or may not be represented in the final ode
-    % system solution, but has been encountered during ode solve.
+    % This condition exists when there is lack of continuity between the
+    % port-choked boundary case and the chamber-choked boundary case.
+    % In the limit as dx -> 0 in the grid this case should disappear.
     essentialConstraint = @(q) ...
             mapq2M(q) - 1;
 
@@ -165,12 +166,8 @@ if pSonicFn(qIn) < pBubble
         iterativeSolveTol);
 else
     caseKeyOut = 'portChoked';
-    [qOut, exitFlag, ~] = iterateToTol(...
-        @processPortChokedCase, ...
-        qIn, ...
-        iterativeSolveTol);
-    if exitFlag ~= 1 || exitFlag == -9 || ...
-            qOut(3) < 0 || ...
+    qOut = processPortChokedCase();
+    if qOut(3) < 0 || ...
             ~(obj.schm.c(qOut) > 0) || ...
             ~(obj.schm.p(qOut) > 0)
         % Relax the numerics (required for predictor steps
@@ -291,7 +288,7 @@ else
                 
                 reiterationCount = reiterationCount + 1;                
                 if reiterationCount > 100
-                    error('Cant decide which case this is. Help!')
+                    error('Error finding case.')
                 end
             end
         else % APortExposed > obj.physConst.crossSectionalArea (expansion)
@@ -309,7 +306,7 @@ else
                 
                 reiterationCount = reiterationCount + 1;                
                 if reiterationCount > 100
-                    error('Cant decide which case this is. Help!')
+                    error('Error finding case.')
                 end
             end
         end
