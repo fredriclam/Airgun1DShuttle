@@ -95,6 +95,13 @@ classdef Chambers
         % shuttle travel axis, as a function of the shuttle
         % displacement [m]. 
         function V = rearVolume(obj, xi)
+            % Input sanitization
+            if length(xi) > 1
+               warning("Chambers>rearVolume is not vectorized. " + ...
+                   "Unexpected behaviour may result. Consider using " + ...
+                   "arrayfun to wrap this function.");
+            end
+            
             % Returns rear volume as function of xi
             x = xi/obj.total_travel_length;
             % Analytic integral of gap profile as function of x/l
