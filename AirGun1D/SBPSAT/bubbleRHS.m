@@ -1,6 +1,7 @@
 % All variables without subscripts belong to the bubble.
 % All variables with subscript _a comes from the airgun.
-function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst, bubbleModel)
+function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
+    y, rho_a, v_a, e_a, p_a, A, physConst, bubbleModel)
     R    = y(1);
     Rdot = y(2);
     m    = y(3);
@@ -44,6 +45,8 @@ function dy = bubbleRHS(y, rho_a, v_a, e_a, p_a, A, physConst, bubbleModel)
     deltaP = C*rho_inf*abs(Rdot)*Rdot;
     dE = rateFactor*A*(e_a + p_a)*v_a - p*Vdot - dQdt ...
          - hemisphereFactor*4*pi*R^2*Rdot*deltaP;
+    workrate = p*Vdot;
+    dEin = rateFactor*A*(e_a + p_a)*v_a;
 
     dpdt = (gama-1)*(dE*V-Vdot*E)/V^2;
 
