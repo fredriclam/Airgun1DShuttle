@@ -62,16 +62,47 @@ end
 % Trap integration
 normL2 = @(f, h) sqrt(h * (sum(f.^2) - 0.5*f(1)^2 - 0.5*f(end)^2));
 
-for i = 2:length(dataConvergence)
-    RErrs(i-1) = sqrt(normL2(RSampledFine{i} - RSampledFine{i-1}, dtFine)^2 + ...
-        normL2(RSampledCoarse{i} - RSampledCoarse{i-1}, dtCoarse)^2);
-    RDotErrs(i-1) = sqrt(normL2(RDotSampledFine{i} - RDotSampledFine{i-1}, dtFine)^2 + ...
-        normL2(RDotSampledCoarse{i} - RDotSampledCoarse{i-1}, dtCoarse)^2);
+for i = 1:length(dataConvergence)-1
+    RErrs(i) = sqrt(normL2(RSampledFine{i} - RSampledFine{end}, dtFine)^2 + ...
+        normL2(RSampledCoarse{i} - RSampledCoarse{end}, dtCoarse)^2);
+    RDotErrs(i) = sqrt(normL2(RDotSampledFine{i} - RDotSampledFine{end}, dtFine)^2 + ...
+        normL2(RDotSampledCoarse{i} - RDotSampledCoarse{end}, dtCoarse)^2);
 end
 
 %% Plot sequential errors
 figure(612); clf;
-plot(nxVector(1:end-1), RErrs, 'k.-');
+subplot(2,1,1);
+loglog(nxVector(1:end-1), RErrs, 'k.-');
 hold on
-plot(nxVector(1:end-1), RErrs, 'k.-');
-loglog(nxVector(1:end-1), 1./nxVector(1:end-1), '--');
+plot(nxVector(1:end-1), 1e-5./nxVector(1:end-1), '--')
+ax1 = gca;
+ax1.XAxis.Label.Interpreter = 'latex';
+ax1.XAxis.Label.String = ...
+    '$n_x$';
+ax1.YAxis.Label.Interpreter = 'latex';
+ax1.YAxis.Label.String = ...
+    ...'$\left( \int (R^{(k)} - R^\mathrm{(ref)})^2(t) dt \right)^{1/2}$';
+    '$\|R^{(k)} - R^\mathrm{(ref)}\|_2$';
+ax1.TickLabelInterpreter = 'latex';
+ax1.FontSize = 13;
+ax1.XAxis.MinorTick = 'on';
+ax1.YAxis.MinorTick = 'on';
+ax1.LineWidth = 1.;
+
+subplot(2,1,2);
+loglog(nxVector(1:end-1), RDotErrs, 'k.-');
+hold on
+plot(nxVector(1:end-1), 1e-3./nxVector(1:end-1), '--')
+ax1 = gca;
+ax1.XAxis.Label.Interpreter = 'latex';
+ax1.XAxis.Label.String = ...
+    '$n_x$';
+ax1.YAxis.Label.Interpreter = 'latex';
+ax1.YAxis.Label.String = ...
+    ...'$\left( \int (\dot{R}^{(k)} - \dot{R}^\mathrm{(ref)})^2(t) dt \right)^{1/2}$';
+    '$\|\dot{R}^{(k)} - \dot{R}^\mathrm{(ref)}\|_2$';
+ax1.TickLabelInterpreter = 'latex';
+ax1.FontSize = 13;
+ax1.XAxis.MinorTick = 'on';
+ax1.YAxis.MinorTick = 'on';
+ax1.LineWidth = 1.;

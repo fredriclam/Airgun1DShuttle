@@ -1,3 +1,7 @@
+% Working script that contains various postprocess routines.
+% To be split into multiple files.
+
+%% Header
 assert(strcmpi(...
     'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
     cd))

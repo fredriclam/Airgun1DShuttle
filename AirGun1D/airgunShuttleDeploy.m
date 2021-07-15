@@ -43,7 +43,7 @@ airgunFiringChamberProfile = @(x) error(...
 midChamberMode = 'limit-closed';
 
 %% Set port parameters
-airgunPortAreaRatio = 0.80; %110/180;                        % Portion of lateral area covered by port [-]
+airgunPortAreaRatio = 110/180;0.80; %110/180;                        % Portion of lateral area covered by port [-]
 airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
 airgunPortLength = 2.375;                           % Length of port [in]
 % Shuttle parameters

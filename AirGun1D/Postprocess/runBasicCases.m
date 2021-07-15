@@ -1,0 +1,164 @@
+% Runs the three basic cases:
+%   1. Fully coupled model with spherical bubble, power-law p_b distrib.
+%   2. Uncoupled model (instant port open) with same bubble model
+%   3. Uncoupled model with uniform-pressure bubble model
+% and generates postprocesss figures.
+
+%% Runs
+% Set parallel pool
+% If parallel toolbox is not installed, comment out the following and
+% replace parfeval with airgunShuttleDeploy( nx, true, [...] ).
+pool = gcp('nocreate');
+if isempty(pool)
+pool = parpool(3);
+end
+
+% Coupled, with power-law pressure in bubble
+fPowerCoupled = parfeval(pool, @airgunShuttleDeploy, 2, ...
+    nx, true, ...
+    struct('bubbleModel', 'single-power'));
+% Lumped parameter airgun, power-law bubble
+fCoupledPower = parfeval(pool, @airgunShuttleDeploy, 2, ...
+    nx, false, ...
+    struct('bubbleModel', 'single-power'));
+% Lumped parameter airgun, lumped bubble
+fCoupledAvg = parfeval(pool, @airgunShuttleDeploy, 2, ...
+    nx, false, ...
+    struct('bubbleModel', 'single'));
+
+%% Compute postprocess data (signals, fft of signal, wall pressure)
+coupled.postprocess = buildState( ...
+    fPowerCoupled.OutputArguments{1}, ...
+    fPowerCoupled.OutputArguments{2}, HiTestData);
+uncoupledpower.postprocess = buildState( ...
+    fCoupledPower.OutputArguments{1}, ...
+    fCoupledPower.OutputArguments{2}, HiTestData);
+uncoupledavg.postprocess = buildState( ...
+    fCoupledAvg.OutputArguments{1}, ...
+    fCoupledAvg.OutputArguments{2}, HiTestData);
+
+%% Plot mass flow rate
+figure(1010); clf
+tL = tiledlayout(2,2);
+nexttile(4, [1, 1]);
+
+plot(1e3*coupled.postprocess.t,coupled.postprocess.portMassFlow, ...
+    '-', 'LineWidth', 1.5);
+hold on
+plot(1e3*uncoupledavg.postprocess.t,uncoupledavg.postprocess.portMassFlow, ...
+    '-', 'LineWidth', 1.5);
+plot(1e3*uncoupledpower.postprocess.t,uncoupledpower.postprocess.portMassFlow, ...
+    '--', 'LineWidth', 1.5);
+hold off
+xlim([0, 300])
+ylim([0, 600])
+set(gca, 'TickLabelInterpreter', 'latex', 'FontSize', 12.5, ...
+    'XMinorTick', 'on', ...
+    'YMinorTick', 'on', ...
+    'TickLength', [0.0100    0.0250]);
+xlabel('$t$ [ms]', 'Interpreter', 'latex')
+ylabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex')
+
+legend({'Coupled model', 'Uncoupled model', 'Uncoupled model $p\sim r^{-2}$'}, ...
+    'Location', 'best', 'Interpreter' ,'latex')
+
+%% Plot signals
+nexttile(1, [1,2]);
+plot(1e3*coupled.postprocess.timeDAQ, ...
+     coupled.postprocess.signalData/1e3, '.-k', ...
+     'MarkerSize', 2);
+hold on
+plot(1e3*coupled.postprocess.tSample, ...
+     coupled.postprocess.signalModel/1e3, '-', 'LineWidth', 1.5);
+plot(1e3*uncoupledavg.postprocess.tSample, ...
+     uncoupledavg.postprocess.signalModel/1e3, '--', 'LineWidth', 1.5);
+plot(1e3*uncoupledpower.postprocess.tSample, ...
+     uncoupledpower.postprocess.signalModel/1e3, ':', 'LineWidth', 1.5);
+hold off
+xlabel('$t$ [ms]', 'Interpreter', 'latex')
+ylabel('$\Delta p$ [kPa]', 'Interpreter', 'latex')
+legend({'Hydrophone', 'Coupled model', 'Uncoupled', 'Uncoupled $p\sim r^{-2}$'}, ...
+    'Location', 'best', 'Interpreter' ,'latex')
+
+nexttile(3, [1, 1]);
+plot(1e3*coupled.postprocess.timeDAQ, coupled.postprocess.signalData/1e3, '.-k', ...
+    'MarkerSize', 2);
+hold on
+plot(1e3*coupled.postprocess.tSample, coupled.postprocess.signal/1e3, '-', 'LineWidth', 1.5);
+plot(1e3*uncoupledavg.postprocess.tSample, uncoupledavg.postprocess.signal/1e3, '-', 'LineWidth', 1.5);
+plot(1e3*uncoupledpower.postprocess.tSample, uncoupledpower.postprocess.signal/1e3, '-', 'LineWidth', 1.5);
+hold off
+xlim([0, 300])
+xlabel('$t$ [ms]', 'Interpreter', 'latex')
+ylabel('$\Delta p$ [kPa]', 'Interpreter', 'latex')
+legend({'Hydrophone', 'Coupled model', 'Uncoupled', 'Uncoupled $p\sim r^{-2}$'}, ...
+    'Location', 'best', 'Interpreter' ,'latex')
+
+%% Figure formatting
+set(gcf, 'position', [-1707, 248, 1000, 633]);
+set(gca, 'TickLabelInterpreter', 'latex', 'FontSize', 12.5, ...
+    'XMinorTick', 'on', ...
+    'YMinorTick', 'on', ...
+    'TickLength', [0.0100    0.0250]);
+
+%% Frequency domain plot
+figure(1011); clf
+loglog(coupled.postprocess.omegaVecDataPositive, ...
+    abs(coupled.postprocess.datafftPositive), '.-k', ...
+    'MarkerSize', 2)
+hold on
+loglog(coupled.postprocess.omegaVecPositive, ...
+    abs(coupled.postprocess.modelfftPositive), '.-b', ...
+    'MarkerSize', 2)
+hold off
+legend({'Data','Coupled model'})
+
+%% Wall pressure
+figure(1012); clf;
+
+% Plot pressure [MPa] vs. t [ms]
+plot(1000*coupled.postprocess.iNetTimeAxis, ...
+     1e-6*coupled.postprocess.iNetp_L, 'b-', 'LineWidth', 1);
+hold on
+plot(1000*coupled.postprocess.t, 1e-6*coupled.postprocess.p_LGrid, 'k-', 'LineWidth', 1);
+plot(1000*uncoupledpower.postprocess.t, 1e-6*uncoupledpower.postprocess.p_LGrid, 'r-', 'LineWidth', 1);
+plot(1000*uncoupledavg.postprocess.t, 1e-6*uncoupledavg.postprocess.p_LGrid, 'g-', 'LineWidth', 1);
+hold off
+
+xlim([0, 500]);
+
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
+legend({'Data', 'Model $p_\mathrm{L}$', ...
+        'Model $p_\mathrm{L}$ no-shuttle 100 ms', ...
+        'As above, uniform bubble pressure'}, ...
+    'Interpreter', 'latex', 'FontSize', 13);
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')
+
+%% External/bubble pressure
+figure(1013); clf;
+
+% Plot pressure [MPa] vs. t [ms]
+% Trim index for data
+trimIndex = find(coupled.postprocess.iNetp_B > 0.15e6,1 ,'first') -1 ;
+iNetTimeAxis_p_B = coupled.postprocess.iNetTimeAxis_p_B(trimIndex:end) ...
+    - coupled.postprocess.iNetTimeAxis_p_B(trimIndex);
+plot(1000*iNetTimeAxis_p_B, ...
+     1e-6*coupled.postprocess.iNetp_B(trimIndex:end), 'b-', 'LineWidth', 1);
+hold on
+plot(1000*coupled.postprocess.t, 1e-6*coupled.postprocess.bubblePressure, 'k-', 'LineWidth', 1);
+plot(1000*uncoupledpower.postprocess.t, 1e-6*uncoupledpower.postprocess.bubblePressure, 'r-', 'LineWidth', 1);
+plot(1000*uncoupledavg.postprocess.t, 1e-6*uncoupledavg.postprocess.bubblePressure, 'g-', 'LineWidth', 1);
+hold off
+
+xlim([0, 100]);
+
+xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
+legend({'Data', 'Model $p_\mathrm{L}$', ...
+        'Model $p_\mathrm{L}$ no-shuttle 100 ms', ...
+        'As above, uniform bubble pressure'}, ...
+    'Interpreter', 'latex', 'FontSize', 13);
+set(gca, 'FontSize', 12, 'TickLabelInterpreter', 'latex', ...
+    'XMinorTick', 'on', 'YMinorTick', 'on')

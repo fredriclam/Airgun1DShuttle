@@ -19,9 +19,19 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         hemisphereFactor = 0.5;
         % Quad bubble rate factor
         rateFactor = 1/4;
+        % Disable rarefaction factor
+        rarefactionFactor = 1;
     elseif strcmpi('single', bubbleModel)
+        % Set all to default:
         hemisphereFactor = 1.0;
         rateFactor = 1;
+        rarefactionFactor = 1;
+    elseif strcmpi('single-power', bubbleModel)
+        % Single bubble with power-law pressure distribution
+        hemisphereFactor = 1.0;
+        rateFactor = 1;
+        pressurePower = -2.0;
+        rarefactionFactor = (pressurePower + 3) / 3;
     end
     
     V = hemisphereFactor * (4/3*pi*R^3);
@@ -56,7 +66,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     b = 0;
     alpha=0.8; %b*abs(Rdot); %10;
 %     alpha =0;
-    dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt ...
+    dRdot = 1/R*((rarefactionFactor*p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt ...
         - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
     
     dm = rateFactor*A*rho_a*v_a;
