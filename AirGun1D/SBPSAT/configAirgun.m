@@ -2,7 +2,7 @@ function [physConst, t0, icAirgun, icBubble] = configAirgun(str, ...
     airgunPressure,airgunLength,airgunPortArea,airgunDepth, ...
     airgunCrossSectionalArea, airgunFiringChamberProfile, ...
     airgunOperatingChamberProfile, bubbleInitialVolume, ...
-    shuttleBdryPenaltyStrength, airgunPortLength)
+    shuttleBdryPenaltyStrength, airgunPortLength, extraOptions)
 
 % Set defaults for last arguments backward compatibility
 if nargin == 5
@@ -10,8 +10,10 @@ if nargin == 5
         error(['Invalid number of input arguments for' ...
                'GeneralAirgun setting.']);
     end
-elseif nargin < 5 || nargin ~= 11
+elseif nargin < 11
     error('Invalid number of input arguments.')
+elseif nargin < 12
+    extraOptions = struct();
 end
 
 switch str
@@ -137,8 +139,15 @@ switch str
         % physConst.AirgunCutoffTime = 0.04;
         
         %% Compute airgun initial conditions
+        
+        if isfield(extraOptions, 'TInitial')
+            T = extraOptions.TInitial;
+            disp('Using extra option -- TInitial -- for bubble & chamber');
+        else
+            T = physConst.Tinf;
+        end
+        
         p = physConst.p0a;
-        T = physConst.Tinf;
         Q = physConst.Q;
         c_v = physConst.c_v;
         rho = p/(Q*T);
@@ -151,7 +160,6 @@ switch str
         
         %% Set bubble initial conditions and gas air parameters
         p = physConst.p_inf;
-        T = physConst.Tinf;
         Q = physConst.Q;
         c_v = physConst.c_v;
         

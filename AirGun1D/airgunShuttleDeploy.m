@@ -17,8 +17,8 @@ addpath ..\sbplib
 %% Simulation controls
 % Simulation window [s]
 % Suggested values:
-% 0.100 to 0.600 s
-tspan = [0; 0.200];
+% [0, and 0.100 to 0.600 s]
+tspan = [0; 0.300];
 % Set flag for running shuttle-free model
 runShuttleFreeFlag = false;
 
@@ -28,6 +28,11 @@ bubbleModel = 'single';
 %% Set ambient parameters
 airgunDepth = 10;                                 % Depth of airgun [m]
 bubbleInitialVolume = 10;                         % Initial volume [cui] -- changed
+if ~coupleToShuttle
+    % Pick larger seed bubble volume to control initial bubble pressure
+    % increase and maintain backward compatibility with Watson et al. 2019
+    bubbleInitialVolume = 600;
+end
 airgunPressure = 1000;                            % Initial pressure in airgun [psi]
 
 %% Set firing chamber parameters
@@ -61,7 +66,12 @@ shuttleBdryPenaltyStrength = 1e11;                % Linear elastic penalty term 
 %     (airCushionLength / (airCushionLength - (xi - accelerationLength)));
 airgunOperatingChamberProfile = @() error('Legacy argument used');
 
+%% Extra options struct for passing through to airgunConfig
+extraOptions = struct();
+
 %% Evaluate options
+% Unpacks all the provided options into the local scope, replacing
+% and above presets.
 if useOverrideOptions
     optionsKeys = fields(options);
     for i = 1:length(optionsKeys)
@@ -96,7 +106,8 @@ metadata = struct(...
     'paramAirgun', paramAirgun, ...
     'nx', nx, ...
     'tspan', tspan, ...
-    'usingShuttleModel', coupleToShuttle);
+    'usingShuttleModel', coupleToShuttle, ...
+    'extraOptions', extraOptions);
 
 %% Run solve for both models    
 [solution, metadata] = ...

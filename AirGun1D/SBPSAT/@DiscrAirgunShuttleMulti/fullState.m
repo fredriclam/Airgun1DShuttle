@@ -333,9 +333,9 @@ cPort = sqrt(obj.physConst.gamma * obj.physConst.Q * TPort);
 % Bubble state recompute
 % This calls bubbleRHS once the port state (in the form of a hat-state)
 % is known. This is used to compute energy transfer terms using bubbleRHS.
-[~, dQdt, workrate, dEin]= bubbleRHS(bubble, rhoPort, velocityPort, ...
+[~, dQdt, workrate, dEin]= bubbleRHS(t, bubble, rhoPort, velocityPort, ...
     eTotalPort, pPort, ...
-    obj.physConst.crossSectionalArea, obj.physConst, 'single');
+    obj.physConst.crossSectionalArea, obj.physConst, obj.bubbleModel);
 
 if INCLUDE_ALL_PRIMITIVES
     % Compute primitives everywhere in Euler domain
