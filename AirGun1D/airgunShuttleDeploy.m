@@ -1,3 +1,7 @@
+% Wrapper for running airgun-shuttle coupled model. 
+% Sets default parameters, and overrides with valid fields provided through
+% `options` by unpacking the variables into the local namespace.
+% 
 % 
 function [solution, metadata] = airgunShuttleDeploy(nx, coupleToShuttle, options)
 if nargin == 1
