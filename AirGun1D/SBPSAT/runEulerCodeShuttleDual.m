@@ -74,6 +74,18 @@ function [solution, metadata] = ...
             metadata.extraOptions);
     q0 = discretization.q0;
     bubble0 = discretization.bubble0;
+    % Injection for partitioned-energy bubble model
+    if isstr(bubbleModel)
+        if strcmpi('partition', bubbleModel)
+            bubble0 = [bubble0; 0];
+        end
+    elseif isstruct(bubbleModel)
+        if strcmpi('partition', bubbleModel.type)
+            bubble0 = [bubble0; 0];
+        end 
+    else
+        error('Unknown bubble model')
+    end
     shuttle0 = discretization.shuttle0;
     RHS = discretization.RHS;
     

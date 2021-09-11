@@ -6,11 +6,11 @@ figure(301); clf;
 
 % Prep data
 temp.bS_reference = [fullState.bubbleStates];
-temp.bS_power = [fullState_power.bubbleStates];
+temp.bS_partition = [fullState_partition.bubbleStates];
 p_reference = [temp.bS_reference.p];
 t_reference = [fullState.t];
-p_power = [temp.bS_power.p];
-t_power = [fullState_power.t];
+p_partition = [temp.bS_partition.p];
+t_partition = [fullState_partition.t];
 clear temp;
 
 tL = tiledlayout(1,4);
@@ -21,9 +21,6 @@ for i = 1:2
         nexttile(tL, 2, [1,3]);
     end
     plot(1e3*t_reference, p_reference/1e6, 'k', 'LineWidth', 1.5)
-    % hold on
-    % plot(1e3*t_power, p_power/1e6, 'b.')
-    % hold off
 
     % Prep field data
     psiPa_conversion = 6894.75729;
@@ -44,6 +41,12 @@ for i = 1:2
          'Color', [0.6588    0.1686    0.1686])
     hold off
     xlim([0, 300])
+    
+    hold on
+    plot(1e3*t_partition, p_partition/1e6, '-', ...
+         'LineWidth', 1.5, ...
+         'Color', [0.9608    0.5294    0.9529])
+    hold off
 
     ylabel('$p$ [MPa]', 'Interpreter', 'latex')
     xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
@@ -57,7 +60,7 @@ for i = 1:2
     else
         ylabel("")
         legend(...
-            [ "Model", "Data" ], ...
+            [ "Model", "Data", "Partition model" ], ...
             'Interpreter', 'latex', 'Location', 'northeast');
         set(gca,'YTickLabel',arrayfun(@(x) "", 1:8))
     end

@@ -97,15 +97,32 @@ flowL2R = ...
 
 %% Compute dz
 
+% Quadratic damping term (off by default)
+quadraticDampingConstant = 0;
+
 % Linear damping term
-linearDamping = - 2.5e4*z(2);
+% Backward-compatible damping constant setting
+if isfield(physConst, 'dampingQuadraticConstant')
+    quadraticDampingConstant = physConst.dampingQuadraticConstant;
+    dampingConstant = 0;
+elseif isfield(physConst, 'dampingConstant')
+    dampingConstant = physConst.dampingConstant;
+else
+    dampingConstant = 2.5e4;
+end
+linearDamping = - dampingConstant * z(2);
+
+% Compute quadratic flow-related damping if given explicitly
+%   as gamma * (p * M^2)_in * A
+quadraticDamping = - sign(z(2)) * quadraticDampingConstant * ...
+    g * pMax * M^2 * chamberSet.gapArea(z(1));
 
 netForce = ...
       p_L*A_L ...
       - p_Mid * A_Mid ...
       + p_rear*physConst.shuttle_area_right_rear ...
       - p_front*A_R ...
-      + penaltyForce + linearDamping;
+      + penaltyForce + linearDamping + quadraticDamping;
 
 dz = [z(2);
       netForce/physConst.shuttleAssemblyMass;

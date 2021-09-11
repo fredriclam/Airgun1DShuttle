@@ -35,10 +35,14 @@ semilogx(omegaVec, SPL_formula(modelfft), 'k', 'LineWidth', 1)
 drawnow
 hold on
 datafft = abs(fft(signalData))/length(omegaVec);
-loglog(omegaVec, ...
-    SPL_formula(datafft), 'b.-', ...
-    'MarkerSize', 6, ...
-    'LineWidth', 1); % 'Color', [123, 31, 21]/255)
-drawnow
-hold off
-legend(["Model", "Data"])
+try
+    loglog(omegaVec, ...
+        SPL_formula(datafft), 'b.-', ...
+        'MarkerSize', 6, ...
+        'LineWidth', 1); % 'Color', [123, 31, 21]/255)
+    drawnow
+    hold off
+    legend(["Model", "Data"])
+catch
+    warning("Plotting failed. Returning")
+end

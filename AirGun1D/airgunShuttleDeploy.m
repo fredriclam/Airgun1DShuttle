@@ -41,7 +41,7 @@ airgunPressure = 1000;                            % Initial pressure in airgun [
 
 %% Set firing chamber parameters
 airgunVolume = 20600;                             % Volume of airgun [cui]
-airgunInnerDiameter = 10.0;                     % Inner diameter of airgun [in]
+airgunInnerDiameter = 10.0;                       % Inner diameter of airgun [in]
 % Function prescribing firing chamber profile for future implementation
 % Not used in current version.
 airgunFiringChamberProfile = @(x) error(...

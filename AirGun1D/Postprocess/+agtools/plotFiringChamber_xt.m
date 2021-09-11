@@ -12,7 +12,7 @@
 %   Plots to current figure.
 
 function plotFiringChamber_xt( ...
-    fullState, metadata, caseKeyContext)
+    fullState, metadata)
 
 % Pull model data
 t = [fullState.t];
@@ -29,8 +29,8 @@ else
 end
 
 if has_shuttle_position
-    tL = tiledlayout(4,4);
-    nexttile(tL, 5, [3,3]);
+    tL = tiledlayout(4,5);
+    nexttile(tL, 6, [3,3]);
 end
 
 [tGrid, xGrid] = meshgrid(t, x);
@@ -44,9 +44,10 @@ cbh = colorbar('TickLabelInterpreter', 'latex', 'FontSize', 14, ...
 xlabel(cbh, '$p$ [MPa]', 'FontSize', 14, 'Interpreter', 'latex')
 colormap cool
 set(gca, 'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
-    'XMinorTick', 'on', 'YMinorTick', 'on' ...
-    ...,'YTickLabel', {'','','','',''}
+    'XMinorTick', 'on', 'YMinorTick', 'on', ...
+    'TickLength', [0.01, 0.025]*1.6...,'YTickLabel', {'','','','',''}
     );
+ylim([0, 100])
 
 % Plot tracker line for next figure
 tIndexSample = 5000;
@@ -66,20 +67,37 @@ caxis([0,7])
 %     hold on
 % end
 
-% Shuttle position attachment
 if has_shuttle_position
-    nexttile(tL, 8, [3,1]);
-    for i = 1:length(caseKeyContext.caseKeySwitchIndices)-1
-        % Include the right boundary element too for continuity
-        plotRange = caseKeyContext.caseKeySwitchIndices(i)+1: ...
-            min(length(t), caseKeyContext.caseKeySwitchIndices(i+1)+1);
-    %     plot(shuttle_position(plotRange), t(plotRange), ...
-    %         [caseKeyContext.colorMap{1+caseKeyContext.caseKeyHistory(plotRange(1))}], 'LineWidth', 1);
-        plot(shuttle_position(plotRange), 1e3*t(plotRange), ...
-            'k', 'LineWidth', 1);
-        hold on
-    end
-    hold off
+    % Plot shuttle position
+    nexttile(tL, 9, [3,1]);
+    plot(shuttle_position, 1e3*t, ...
+        'k', 'LineWidth', 1);
+    set(gca, 'YTickLabel', {'','','','',''}, ...
+        'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+        'XMinorTick', 'on', 'YMinorTick', 'on', ...
+        'TickLength', [0.01, 0.025]*1.6)
+    % Sync vertical axis
+    xlim([0, 0.07])
+    ylim([0, ylimCurrent(2)])
+    % set(gca, 'position', [0.76, 0.13, 0.15, 0.8])
+    xlabel('$\xi$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
+    
+    % Mass rate out
+    nexttile(tL, 10, [3,1]);
+    t = [fullState.t];
+    pS = [fullState.portStates];
+    massRate = [pS.massFlowPort];
+
+    plot(massRate, 1e3*t, 'k', 'LineWidth', 1);
+
+    xlabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex', 'FontSize', 14)
+%     ylabel('$\dot{m}$ [kg/s]', 'Interpreter', 'latex', 'FontSize', 14)
+    set(gca, 'YTickLabel', {'','','','',''}, ...
+        'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
+        'XMinorTick', 'on', 'YMinorTick', 'on', ...
+        'TickLength', [0.01, 0.025]*1.6)
+    % Sync vertical axis
+    ylim([0, ylimCurrent(2)])
 end
 
 % legendLabels = {'Closed', ...
@@ -90,14 +108,6 @@ end
 %     'Relaxation'};
 % legend(legendLabels, 'Interpreter', 'latex', 'location', 'eastoutside', ...
 %     'FontSize', 10)
-
-set(gca, 'YTickLabel', {'','','','',''}, ...
-    'FontSize', 14, 'TickLabelInterpreter', 'latex', ...
-    'XMinorTick', 'on', 'YMinorTick', 'on')
-% Sync vertical axis
-ylim([0, ylimCurrent(2)])
-% set(gca, 'position', [0.76, 0.13, 0.15, 0.8])
-xlabel('$\xi$ [m]', 'Interpreter', 'latex', 'FontSize', 14)
 
 % Resize axes
 % subplot(1,3,3);

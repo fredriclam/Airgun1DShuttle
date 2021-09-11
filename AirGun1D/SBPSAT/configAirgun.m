@@ -179,6 +179,11 @@ switch str
         
         % Set fixed shuttle assembly mass [kg]
         physConst.shuttleAssemblyMass = 63 * .454;
+        if isfield(extraOptions, 'shuttleAssemblyMass')
+            physConst.shuttleAssemblyMass = ...
+                extraOptions.shuttleAssemblyMass;
+            disp('Using extra option -- shuttleAssemblyMass');
+        end
         
         % Convert port area from [in^2] to [m^2]
         physConst.APortTotal = airgunPortArea*0.00064516;
@@ -226,6 +231,18 @@ switch str
         physConst.shuttleBdryPenaltyStrength = shuttleBdryPenaltyStrength;
         
         physConst.airgunPortLength = airgunPortLength;
+        
+        if isfield(extraOptions, 'dampingConstant')
+            physConst.dampingConstant = ...
+                extraOptions.dampingConstant;
+            disp('Using extra option -- dampingConstant');
+        end
+        
+        if isfield(extraOptions, 'dampingQuadraticConstant')
+            physConst.dampingQuadraticConstant = ...
+                extraOptions.dampingQuadraticConstant;
+            disp('Using extra option -- dampingQuadraticConstant');
+        end
         
     otherwise
         error();

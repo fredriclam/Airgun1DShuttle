@@ -81,7 +81,7 @@ legend({'Model', 'Data'}, ...
 %% Contour plot
 figure(2); clf;
 agtools.plotFiringChamber_xt( ...
-fullState, metadata_reference, caseKeyContext);
+fullState, metadata_reference);
 
 %% Mass rate out plot
 figure(3); clf;
