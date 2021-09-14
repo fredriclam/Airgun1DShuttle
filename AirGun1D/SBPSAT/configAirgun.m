@@ -201,7 +201,7 @@ switch str
         % Ludvig paramters for airgun area:
 %         A_L = 0.0586; % [m^2]
 %         A_R = 0.0506; % [m^2]
-        % Artificial shuttle left and right areas
+        % Approximate shuttle left and right areas
         physConst.shuttle_area_left = pi/4 * (11.2 * 0.0254)^2; % [m^2]
         % physConst.shuttle_area_left = physConst.crossSectionalArea; % [m^2]
         
@@ -218,7 +218,6 @@ switch str
             (11.1 * 0.0254)^2 - (2.1 * 0.0254)^2); % [m^2]
         
         % Lead-in length where shuttle can move without exposing the air
-        physConst.portLead = 0.35 * 0.0254; % [m] -- CHANGE?
         physConst.portLead = 0.0 * 0.0254; % [m] -- CHANGED
         
         physConst.flangeDepth = 3 * 0.0254; % [m]
@@ -231,17 +230,24 @@ switch str
         physConst.shuttleBdryPenaltyStrength = shuttleBdryPenaltyStrength;
         
         physConst.airgunPortLength = airgunPortLength;
+        physConst.midChamberLength = 3.112 * 0.0254;
+        physConst.midChamberArea = physConst.shuttle_area_left;
+        physConst.OpRearOrificeArea = (1e-2)^2;
         
         if isfield(extraOptions, 'dampingConstant')
             physConst.dampingConstant = ...
                 extraOptions.dampingConstant;
             disp('Using extra option -- dampingConstant');
         end
-        
         if isfield(extraOptions, 'dampingQuadraticConstant')
             physConst.dampingQuadraticConstant = ...
                 extraOptions.dampingQuadraticConstant;
             disp('Using extra option -- dampingQuadraticConstant');
+        end
+        if isfield(extraOptions, 'OpRearOrificeArea')
+            physConst.OpRearOrificeArea = ...
+                extraOptions.OpRearOrificeArea;
+            disp('Using extra option -- OpRearOrificeArea');
         end
         
     otherwise

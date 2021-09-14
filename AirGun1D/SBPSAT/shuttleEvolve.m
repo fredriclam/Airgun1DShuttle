@@ -1,4 +1,4 @@
-function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve( ...
+function [dz, p_rear, p_front, p_mid, subsystemState] = shuttleEvolve( ...
     z, p_L, physConst, chamberSet)
 % Computes evolution of the state vector
 %   z = [pos; vel; m_L; E_L; m_R; E_R]
@@ -8,6 +8,9 @@ function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve( ...
 %
 %   Input:
 %     z = [pos; vel; m_L; E_L; m_R; E_R]
+%       or
+%         [pos; vel; m_L; E_L; m_R; E_R; m_mid; E_mid]
+%       for the midChamberMode 'connected'.
 %     p_L = pressure on left side of shuttle assembly (from firing chamber)
 %     physConst = struct of physical constants
 %     chamberSet = object of type Chambers
@@ -15,21 +18,33 @@ function [dz, p_rear, p_front, p_Mid, subsystemState] = shuttleEvolve( ...
 %     p_rear = pressure at rear of shuttle, in operating chamber
 %     p_front = pressure at front of shuttle, in operating chamber
 %     p_Mid = pressure in middle chamber (if vented to ambient, constant)
-%     subsystemState = human-readable struct with all relevant states and
-%       differentials
+%     subsystemState = human-readable struct with relevant states and dz
 
 %% Compute thermodynamic state and define helper variables
+% Define local constant names
+g = physConst.gamma;
+c_p = physConst.c_v + physConst.Q;
+
 % Unpack state
 m_rear = z(3);
 E_rear = z(4);
 m_front = z(5);
 E_front = z(6);
+m_mid = z(7);
+E_mid = z(8);
 
 % Compute elastic penalty for constraint z(1) >= 0
 penaltyForce = physConst.shuttleBdryPenaltyStrength * ...
     (z(1) < 0) * abs(z(1));
 A_L = physConst.shuttle_area_left;
 A_R = physConst.shuttle_area_right;
+
+% Mid chamber
+midChamberLength = physConst.midChamberLength;
+A_Mid = physConst.shuttle_area_right_rear;
+pAmbient = physConst.p_inf;
+
+vol_mid = A_Mid * (midChamberLength - z(1));
 
 % Compute mass flow rates
 % Geometrically constrained density
@@ -45,33 +60,26 @@ T_front = E_front / (m_front * physConst.c_v);
 % Ideal gas pressure
 p_front = rho_front * physConst.Q * T_front;
 
-% In middle chamber: assumptions
-midChamberLength = 3.112 * 0.0254;
-A_Mid = physConst.shuttle_area_right_rear;
+rho_mid = m_mid / vol_mid;
+T_mid = E_mid / (m_mid * physConst.c_v);
+p_mid = rho_mid * physConst.Q * T_mid;
 
-% IMPORTANT: assuming depth of 10m, and also 1000kg/m^3 water
-% Atmospheric plus water depth pressure
-pAmbient = 1e5 + 9.8*1e3 * 10;
-% Initial mid chamber pressure
-p0_Mid = pAmbient;
-
-if strcmpi('limit-vented', chamberSet.midChamberMode)
-    % p0_Mid = physConst.p_R0;
-    % EAGE model: venting valve.
-    % Here we assume the equilibration is instantaneous (to be replaced by
-    % possible gas exchange to back chamber and exterior)    
-    p_Mid = p0_Mid;
-elseif strcmpi('limit-closed', chamberSet.midChamberMode)
-    % Allowing adiabatic compression
-    p_Mid = p0_Mid * (midChamberLength / ...
-            (midChamberLength-z(1)))^physConst.gamma;
-else
-    error('Mid chamber mode unset')
-end
-
-% Define local aliases
-g = physConst.gamma;
-c_p = physConst.c_v + physConst.Q;
+% % Legacy: closed chamber approximation of mid chamber
+% if strcmpi('limit-vented', chamberSet.midChamberMode)
+%     % p0_Mid = physConst.p_R0;
+%     % EAGE model: venting valve.
+%     % Here we assume the equilibration is instantaneous (to be replaced by
+%     % possible gas exchange to back chamber and exterior)    
+%     p_Mid = p0_Mid;
+% elseif strcmpi('limit-closed', chamberSet.midChamberMode)
+%     % Allowing adiabatic compression
+%     p_Mid = p0_Mid * (midChamberLength / ...
+%             (midChamberLength-z(1)))^physConst.gamma;
+% elseif strcmpi('connected', chamberSet.midChamberMode)
+%     
+% else
+%     error('Mid chamber mode unset')
+% end
 
 %% Compute flow between partition of operating chamber
 % Compute direction of flow and pressure ratio (positive if rear to front)
@@ -94,6 +102,27 @@ flowL2R = ...
     flowSignL2R * chamberSet.gapArea(z(1)) * M * ...
     sqrt(g * pMax * rhoMax) * ...
     (1 + (g-1)/2 * M^2)^(0.5*(-g-1)/(g-1));
+
+%% L-chamber to mid chamber flow
+flowSignL2M = sign(p_rear - p_mid);
+pRatioL2M = min([p_rear/p_mid, p_mid/p_rear]);
+% Compute mach number due to expansion capping to choked
+M_L2M = min([1, machPressureFunction(g, pRatioL2M)]);
+% Compute stagnation properties
+if flowSignL2M >= 0
+    pMaxL2M = p_rear;
+    rhoMaxL2M = rho_rear;
+    TMaxL2M = T_rear;
+else
+    pMaxL2M = p_mid;
+    rhoMaxL2M = rho_mid;
+    TMaxL2M = T_mid;
+end
+
+flowL2M = ... 
+    flowSignL2M * physConst.OpRearOrificeArea * M_L2M * ...
+    sqrt(g * pMaxL2M * rhoMaxL2M) * ...
+    (1 + (g-1)/2 * M_L2M^2)^(0.5*(-g-1)/(g-1));
 
 %% Compute dz
 
@@ -119,17 +148,35 @@ quadraticDamping = - sign(z(2)) * quadraticDampingConstant * ...
 
 netForce = ...
       p_L*A_L ...
-      - p_Mid * A_Mid ...
+      - p_mid * A_Mid ...
       + p_rear*physConst.shuttle_area_right_rear ...
       - p_front*A_R ...
       + penaltyForce + linearDamping + quadraticDamping;
 
+% Flow efficiency asymptotic correction for rear volume
+% 0 ~ freezeDistance: no flow allowed
+% freezeDistance ~ limitDistance: flow efficiency proportional to
+%                                 x - freezeDistance
+limitDistance = 0.30 * physConst.midChamberLength;
+freezeDistance = 0.03 * physConst.midChamberLength;
+rearVolRatio = (z(1) - freezeDistance) / ...
+    (limitDistance - freezeDistance);
+rearVolRatio = max(0, rearVolRatio);
+flowefficiency = min(1, rearVolRatio);
+assert(flowefficiency >= 0 && flowefficiency <= 1);
+flowL2R = flowefficiency * flowL2R;
+flowL2M = flowefficiency * flowL2M;
+
 dz = [z(2);
       netForce/physConst.shuttleAssemblyMass;
-      -flowL2R;
-      -c_p * flowL2R * TMax - p_rear * physConst.shuttle_area_right_rear * z(2);
+      -flowL2R - flowL2M;
+      -c_p * flowL2R * TMax ...
+        - c_p * flowL2M * TMaxL2M ...
+        - p_rear * physConst.shuttle_area_right_rear * z(2);
       flowL2R;
-      c_p * flowL2R * TMax + p_front * A_R * z(2);];
+      c_p * flowL2R * TMax + p_front * A_R * z(2);
+      flowL2M;
+      c_p * flowL2M * TMaxL2M + p_mid * A_Mid * z(2);];
 
 % Create human-readable object with shuttle and chamber data
 subsystemState = struct('opChamberRear_m', m_rear, ...
@@ -147,7 +194,7 @@ subsystemState = struct('opChamberRear_m', m_rear, ...
                         'opChamberRear_area', A_R, ...
                         'midChamber_length', midChamberLength, ...
                         'midChamber_area', A_Mid, ...
-                        'midChamber_p', p_Mid, ...
+                        'midChamber_p', p_mid, ...
                         'opChamberFlow_M', M, ...
                         'opChamberFlow_massL2R', flowL2R, ...
                         'opChamberFlow_denergydtL', dz(4), ...

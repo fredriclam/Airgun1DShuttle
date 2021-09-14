@@ -14,9 +14,10 @@ if nargin <= 6
 end
 
 % Tolerance for iterateToTol
-iterativeSolveTol = 1e-8;
+iterativeSolveTol = 1e-6;
 % Max number of iterations allowed for iterateToTol
-iterateToTolMaxIterations = 100;
+iterateToTolMaxIterations = 1;
+caseReiterationMax = 100;
 
 %% Compute primitive variables at right of PDE domain
 q_R = obj.schm.e_R'*q;
@@ -262,7 +263,7 @@ else
     end
     
     % Compute new q_R depending on boundary case
-    if APortExposed == 0 % port is closed
+    if APortExposed <= 1e-4 % port is closed, or close enough
         % Kinematically-constrained case; no boundary values necessary
         % (wall closure used)
         caseKey = 'portClosed'; % Port is closed
@@ -287,7 +288,7 @@ else
                 [qPort, caseKey] = tryCasesContraction(qPort);
                 
                 reiterationCount = reiterationCount + 1;                
-                if reiterationCount > 100
+                if reiterationCount > caseReiterationMax
                     error('Error finding case.')
                 end
             end

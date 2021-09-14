@@ -104,6 +104,10 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
             xi_vel_0 = 0;
             massRear = gasMassPartitionRatio * massOpChamber;
             massFront = (1-gasMassPartitionRatio) * massOpChamber;
+            volMidChamber0 = physConst.midChamberLength * ...
+                physConst.midChamberArea;
+            massMid = (physConst.p_inf) / (physConst.Q * T0) * ...
+                volMidChamber0;
             
             % Set initial shuttle state vector
             obj.shuttle0 = [
@@ -113,6 +117,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 physConst.c_v*T0*massRear;
                 massFront;
                 physConst.c_v*T0*massFront;
+                massMid;
+                physConst.c_v*T0*massMid;
             ];   % [m/s]
         
             %% Bubble
