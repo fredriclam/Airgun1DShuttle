@@ -178,6 +178,7 @@ function [solution, metadata] = ...
     %% Run ODE solver
     % Set ODE solver options
     options = odeset('RelTol',REL_TOL);
+    figure(99);
     sol_ode = ode23(@odefun, tspan, y0,options);
 
     fprintf('ODE solve complete for coupled phase ([%.3f, %.3f] s).\n', ...

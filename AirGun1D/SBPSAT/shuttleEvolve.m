@@ -1,5 +1,5 @@
 function [dz, p_rear, p_front, p_mid, subsystemState] = shuttleEvolve( ...
-    z, p_L, physConst, chamberSet)
+    z, p_L, physConst, chamberSet, Z_L)
 % Computes evolution of the state vector
 %   z = [pos; vel; m_L; E_L; m_R; E_R]
 % for the shuttle assembly and the operating chamber partitions (denoted
@@ -139,6 +139,13 @@ elseif isfield(physConst, 'dampingConstant')
 else
     dampingConstant = 2.5e4;
 end
+% Replace with acoustic impedance is available
+if nargin >= 5
+    dampingConstant = Z_L * physConst.shuttle_area_left;
+    % Slow piston rarefaction limit factor on p_I?
+    pFactor = 0.279;
+end
+
 linearDamping = - dampingConstant * z(2);
 
 % Compute quadratic flow-related damping if given explicitly
@@ -157,8 +164,8 @@ netForce = ...
 % 0 ~ freezeDistance: no flow allowed
 % freezeDistance ~ limitDistance: flow efficiency proportional to
 %                                 x - freezeDistance
-limitDistance = 0.30 * physConst.midChamberLength;
-freezeDistance = 0.03 * physConst.midChamberLength;
+limitDistance = 0.1*0.30 * physConst.midChamberLength;
+freezeDistance = 0.1*0.03 * physConst.midChamberLength;
 rearVolRatio = (z(1) - freezeDistance) / ...
     (limitDistance - freezeDistance);
 rearVolRatio = max(0, rearVolRatio);
@@ -197,6 +204,7 @@ subsystemState = struct('opChamberRear_m', m_rear, ...
                         'midChamber_p', p_mid, ...
                         'opChamberFlow_M', M, ...
                         'opChamberFlow_massL2R', flowL2R, ...
+                        'M_L2M', M_L2M, ...
                         'opChamberFlow_denergydtL', dz(4), ...
                         'opChamberFlow_denergydtR', dz(6), ...
                         'shuttle_position', z(1), ...

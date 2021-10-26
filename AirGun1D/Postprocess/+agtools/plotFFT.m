@@ -23,6 +23,7 @@ if mod(length(tSample),2) ~= 0
     signalData = signalData(1:end-1);
 end
 
+range = @(x) x(end) - x(1);
 dw = 1/range(tSample);
 omegaVec = [0:1:(length(tSample)/2-1), ...
     -length(tSample)/2:1:-1] * dw;

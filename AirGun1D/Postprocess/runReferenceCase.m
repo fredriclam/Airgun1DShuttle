@@ -28,10 +28,12 @@ futuresNoShuttle = parfeval(pool, @airgunShuttleDeploy, 2, ...
     struct('bubbleModel', 'single'));
 
 %% Memory management
+wait(futuresReference);
 solution_reference = futuresReference.OutputArguments{1};
 metadata_reference = futuresReference.OutputArguments{2};
 clear futuresReference;
 %%
+wait(futuresNoShuttle);
 solution_noshuttle = futuresNoShuttle.OutputArguments{1};
 metadata_noshuttle = futuresNoShuttle.OutputArguments{2};
 clear futuresNoShuttle;

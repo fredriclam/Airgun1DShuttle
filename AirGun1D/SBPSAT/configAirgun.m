@@ -187,10 +187,20 @@ switch str
         
         % Convert port area from [in^2] to [m^2]
         physConst.APortTotal = airgunPortArea*0.00064516;
+        % MkI estimate: ~0.0329 m^2
+        disp('configAirgun:Overriding supplied port area with measurement.')
+        % Measurement:
+        physConst.APortTotal = 90 * (0.0254)^2; % 0.0581 m^2
+        
+        
         % Ludvig uses: 0.0464 [m^2] ~ 72 in^2
         
         % Set fixed operating chamber length [m]
-        physConst.operatingChamberLength = 3.009 *0.0254;
+        % Estimate:
+%         physConst.operatingChamberLength = 3.009 *0.0254;
+        % Measurement:
+        physConst.operatingChamberLength = 87.6e-3;
+        
         
         % Set firing chamber and operating chamber profiles A(x)
         physConst.airgunFiringChamberProfile = ...
@@ -198,41 +208,50 @@ switch str
         physConst.airgunOperatingChamberProfile = ...
             airgunOperatingChamberProfile;
         
-        % Ludvig paramters for airgun area:
-%         A_L = 0.0586; % [m^2]
-%         A_R = 0.0506; % [m^2]
-        % Approximate shuttle left and right areas
-        physConst.shuttle_area_left = pi/4 * (11.2 * 0.0254)^2; % [m^2]
-        % physConst.shuttle_area_left = physConst.crossSectionalArea; % [m^2]
+        %% Cupped piston area
+        % Estimate:
+%         physConst.shuttle_area_left = pi/4 * (11.2 * 0.0254)^2; % [m^2]
+        % Actual:
+        physConst.shuttle_area_left = 0.04735; % [m^2]
+       
+        %% Front of shuttle (flange): projected area
+        % Estimate:
+%         physConst.shuttle_area_right = pi/4 * ( ...
+%             (11.1 * 0.0254)^2); % [m^2]
+        % Actual:
+        physConst.shuttle_area_right = 0.06155; % [m^2]
         
-        % Reasonable guess to shuttle right area: ratio using Ludvig's
-        % code, although the areas are different [deprecate]
-%         physConst.shuttle_area_right = 0.0506/0.0586* ...
-%             physConst.crossSectionalArea; % [m^2]
-
-        % Front of shuttle: projected area of cushioned side of piston
-        physConst.shuttle_area_right = pi/4 * ( ...
-            (11.1 * 0.0254)^2); % [m^2]        
         % Rear of shuttle: projected area of piston, minus the shaft area
-        physConst.shuttle_area_right_rear = pi/4 * ( ...
-            (11.1 * 0.0254)^2 - (2.1 * 0.0254)^2); % [m^2]
+        % Estimate of shaft area:
+        shaft_area = pi/4 * (2.1 * 0.0254)^2;
+        physConst.shuttle_area_right_rear = ...
+            physConst.shuttle_area_right - shaft_area; % [m^2]
         
         % Lead-in length where shuttle can move without exposing the air
-        physConst.portLead = 0.0 * 0.0254; % [m] -- CHANGED
+        physConst.portLead = 0.0; % [m]
         
         physConst.flangeDepth = 3 * 0.0254; % [m]
         % Approximate the flange ID to be equal to the chamber
-        physConst.plugVolumeFn = @(xi) ...
-            physConst.crossSectionalArea * (xi + physConst.flangeDepth);
+        
+        
+        physConst.plugVolumeFn = @(xi) error("Deprecated function"); ...
+            % physConst.crossSectionalArea * (xi + physConst.flangeDepth);
 
         % Set shuttle penalty parameter
-        % Note: ~1e11 makes sense based on linear elasticity
+        %   (~1e11 makes sense based on linear elasticity, although
+        %    this should not activate because of the gas region III.)
         physConst.shuttleBdryPenaltyStrength = shuttleBdryPenaltyStrength;
         
         physConst.airgunPortLength = airgunPortLength;
+        % MkI estimate: 2.3750 in
+        disp('configAirgun:Overriding supplied port length with measurement.')
+        % Measurement:
+        physConst.airgunPortLength = 84.6e-3/0.0254; %[in]
+        
         physConst.midChamberLength = 3.112 * 0.0254;
         physConst.midChamberArea = physConst.shuttle_area_left;
-        physConst.OpRearOrificeArea = (1e-2)^2;
+%         physConst.OpRearOrificeArea =  1e-5;
+        physConst.OpRearOrificeArea =  1.37e-6; % (0.052"D)
         
         if isfield(extraOptions, 'dampingConstant')
             physConst.dampingConstant = ...
@@ -251,6 +270,6 @@ switch str
         end
         
     otherwise
-        error();
+        error("in configAirgun: unknown parameters key");
     end
 end

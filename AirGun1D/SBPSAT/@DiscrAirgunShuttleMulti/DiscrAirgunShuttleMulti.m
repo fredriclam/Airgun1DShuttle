@@ -93,7 +93,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 gasMassPartitionRatio = 1;
                 massOpChamber = 0;
             else
-                xi_0 = 1e-3;
+                xi_0 = 0.1e-3;
                 gasMassPartitionRatio = ...
                     obj.chambers.rearVolume(xi_0) / ...
                     obj.chambers.totalVolume();

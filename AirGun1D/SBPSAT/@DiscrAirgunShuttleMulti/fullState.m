@@ -195,26 +195,48 @@ if pSonicFn(qIn) < pBubble
         qIn, ...
         iterativeSolveTol);
 else
-    caseKeyOut = 'chamberChokedForced';
-    % Mach-1 boundary condition at exit of PDE domain
-    [qOut, exitFlag, ~] = iterateToTol(...
-        @processChamberChokedCase, ...
-        qIn, ...
-        iterativeSolveTol);
-    if exitFlag ~= 1 || ...
-            qOut(3) < 0 || ...
-            ~(obj.schm.c(qOut) > 0) || ...
-            ~(obj.schm.p(qOut) > 0)
-        % Relax the numerics (required for predictor steps
-        % sometimes)
-        % Issue:
-        % M_R >> 1 for a step during a portClosed-portChoked only
-        % sequence. See commit [wip 4b534a7].
-        % Fallback case when M_R is too far away from
-        % subsonic, and we fail to find a q such that M(q) = 1
-        % while preserving the outgoing characteristics.
-        caseKeyOut = 'relaxation';
+    % Following code block is an alternative strategy for enforcing sonic
+    % boundary conditions (although it doesn't seem to produce physical
+    % results)
+    if false
         qOut = qIn;
+        % Check grid value
+        if M_R < 1
+            caseKeyOut = 'subsonic';
+            qOut = iterateToTol(...
+                @processSubsonicCase, ...
+                qIn, ...
+                iterativeSolveTol);
+        else
+            caseKeyOut = 'chamberChoked';
+        end
+    end
+    
+    % Issue:
+    % Does enforcing M == 1 eliminate the possibility of wave reflections
+    % perturbing the boundary state from M = 1?
+    if true
+        caseKeyOut = 'chamberChokedForced';
+        % Mach-1 boundary condition at exit of PDE domain
+        [qOut, exitFlag, ~] = iterateToTol(...
+            @processChamberChokedCase, ...
+            qIn, ...
+            iterativeSolveTol);
+        if exitFlag ~= 1 || ...
+                qOut(3) < 0 || ...
+                ~(obj.schm.c(qOut) > 0) || ...
+                ~(obj.schm.p(qOut) > 0)
+            % Relax the numerics (required for predictor steps
+            % sometimes)
+            % Issue:
+            % M_R >> 1 for a step during a portClosed-portChoked only
+            % sequence. See commit [wip 4b534a7].
+            % Fallback case when M_R is too far away from
+            % subsonic, and we fail to find a q such that M(q) = 1
+            % while preserving the outgoing characteristics.
+            caseKeyOut = 'relaxation';
+            qOut = qIn;
+        end
     end
 end
 end
@@ -364,7 +386,7 @@ end
 %% Shuttle detailed state
 if length(shuttle) >= 2
 [~, ~, ~, ~, subsystemState] = shuttleEvolve(shuttle, ...
-    pPort, obj.physConst, obj.chambers);
+    pPort, obj.physConst, obj.chambers, rhoPort * cPort);
 end
 
 %% Construct data hierarchy
