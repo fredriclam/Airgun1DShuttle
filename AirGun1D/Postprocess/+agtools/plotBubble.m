@@ -41,11 +41,11 @@ pBubbleInlet(pBubblePortChoked > pBubbleThermo) = ...
     pBubblePortChoked(pBubblePortChoked > pBubbleThermo);
 
 global_format = @() set(gca, 'FontSize', 14, ...
-    'TickLabelInterpreter', 'latex', ...
+    ...'TickLabelInterpreter', 'latex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on', ...
     'LineWidth', 1);
 
-tL = tiledlayout(3,4);
+tL = tiledlayout(3,3);
 
 nexttile(tL, 1, [1,1])
 plotStep = 1;
@@ -57,13 +57,15 @@ plot(1e3*t(1:plotStep:5000), pBubbleThermo(1:plotStep:5000)/1e6, ...
      'k', 'LineWidth', 1)
 hold off
 xlim([0,10])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
+ylabel ('{\it{p}}_b (MPa)', 'FontSize', 14)
+% xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+% ylabel ('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
 set(gca,'TickLength',4*[0.01, 0.025])
 yL = ylim();
 
-nexttile(tL, 2, [1,3])
+nexttile(tL, 2, [1,2])
 plot(1e3*t(1:100:end), pBubbleInlet(1:100:end)/1e6, '--', ...
      'LineWidth', 1, 'Color', [123, 31, 21]/255)
 hold on
@@ -71,51 +73,56 @@ plot(1e3*t(1:100:end), pBubbleThermo(1:100:end)/1e6, ...
      'k', 'LineWidth', 1)
 hold off
 xlim([0,300])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+% xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
 % ylabel ('$p$ [MPa]', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
 ylim(yL);
 legend({'Bubble inlet pressure', 'Bubble average pressure'}, ...
         'Interpreter', 'latex')
 
-nexttile(tL, 5, [1,1])
+nexttile(tL, 4, [1,1])
 plot(1e3*t(1:plotStep:5000), bubbleMass(1:plotStep:5000), 'k-', ...
      'LineWidth', 1)
 xlim([0,10])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$m$ [kg]', 'Interpreter', 'latex', 'FontSize', 14)
+% xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
+% ylabel ('$m$ [kg]', 'Interpreter', 'latex', 'FontSize', 14)
+ylabel ('{\it{m}} (kg)', 'FontSize', 14)
+
 set(gca,'XMinorTick','on', 'YMinorTick', 'on', 'LineWidth', 1)
 global_format()
 set(gca,'TickLength',4*[0.01, 0.025])
 
-nexttile(tL, 6, [1,3])
+nexttile(tL, 5, [1,2])
 plot(1e3*t(1:100:end), bubbleMass(1:100:end), 'k-', ...
      'LineWidth', 1)
 xlim([0,300])
 ylim([0, 30])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
+% xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
 % ylabel ('$m$ [kg]', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
 
  
-nexttile(tL, 9, [1,1])
+nexttile(tL, 7, [1,1])
 plot(1e3*t(1:plotStep:5000), funcs.VDotDotFn(t(1:plotStep:5000)), 'k-', ...
      'LineWidth', 1)
 xlim([0,10])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$\ddot{V}$ [m${}^3$/s${}^2$]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
+ylabel ('$\ddot{V}$ (m${}^3$/s${}^2$)', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
 set(gca,'TickLength',4*[0.01, 0.025])
 
-nexttile(tL, 10, [1,3])
+nexttile(tL, 8, [1,2])
 plot(1e3*t(1:100:end), funcs.VDotDotFn(t(1:100:end)), 'k-', ...
      'LineWidth', 1)
 xlim([0,300])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$\ddot{V}$ [m${}^3$/s${}^2$]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'FontSize', 14)
+ylabel ('$\ddot{V}$ (m${}^3$/s${}^2$)', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
-ylim([-2e3, 6e3])
-
+ylim([-3e3, 6e3])
+set(gca,'YTick',[-3000, 0, 3000, 6000])
 
 % plot(1e3*t, massRate, 'k', 'LineWidth', 1);
 % 

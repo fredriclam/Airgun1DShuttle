@@ -9,6 +9,12 @@ addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
 
+try
+    load 'HiTestData_v1'
+catch
+    warning('Field trial data not found.')
+end
+
 %% Global parameters
 nx = 40;
 
@@ -26,6 +32,12 @@ futuresReference = parfeval(pool, @airgunShuttleDeploy, 2, ...
 futuresNoShuttle = parfeval(pool, @airgunShuttleDeploy, 2, ...
     nx, false, ...
     struct('bubbleModel', 'single'));
+%%
+futuresWet = parfeval(pool, @airgunShuttleDeploy, 2, ...
+    nx, true, ...
+    struct('bubbleModel', ...
+        struct('type', 'single', 'waterProperties', struct()), 'extraOptions', ...
+    struct('TInitial', 288)));
 
 %% Memory management
 wait(futuresReference);
@@ -37,6 +49,16 @@ wait(futuresNoShuttle);
 solution_noshuttle = futuresNoShuttle.OutputArguments{1};
 metadata_noshuttle = futuresNoShuttle.OutputArguments{2};
 clear futuresNoShuttle;
+%%
+wait(futuresWet);
+solution_wet = futuresWet.OutputArguments{1};
+metadata_wet = futuresWet.OutputArguments{2};
+clear futuresWet;
+
+[fullState_wet] = ...
+        airgunShuttlePostprocess( ...
+        solution_wet, ...
+        metadata_wet);
 
 %% Load full state
 [fullState, caseKeyContext] = ...
@@ -49,6 +71,7 @@ clear futuresNoShuttle;
         solution_noshuttle, ...
         metadata_noshuttle);
 
+return %%% <-----
 %% Plot wall states
 figure(1); clf;
 subplot(3,1,1);

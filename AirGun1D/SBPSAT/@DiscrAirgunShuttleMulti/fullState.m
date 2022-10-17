@@ -47,6 +47,24 @@ pSonic_R = pSonicFn(q_R);
 % pSonic_R = p0_R * ...
 %     (machFactor(1))^(-obj.physConst.gamma/(obj.physConst.gamma-1));
 
+% Compute supersonic branch
+function pRatio = pMinSonic_safe(gamma, ARatio)
+    % Compute minimum pressure ratio p / pBubble for supersonic flow choked
+    % at A_cs
+    if gamma == 1.4
+        % Map equation for pressure ratio to a polynomial equation, solve
+        rr = roots([ARatio^-2,0,0,0,0,-(1+2/(gamma-1)),2/(gamma-1)]);
+        supersonicRoot = rr(5);
+        assert(isreal(supersonicRoot));
+        assert(supersonicRoot >= 1 || ARatio < 1)
+        % Map back to pressure ratio p / pBubble
+        pRatio = supersonicRoot.^(7/2);
+    else
+        error("pMinSonic only configured for gamma = 1.4");
+    end
+end
+pMinSonic = @(ARatio) pMinSonic_safe(obj.physConst.gamma, ARatio);
+
 %% Capture flow state in PDE domain
 flowState = obj.schm.flowStateR(q);
 
@@ -78,7 +96,7 @@ function [qPort, exitFlag] = processSubsonicCase(qIn)
     % Check entropy (exponential-entropy)
     entropyFn = @(p, rho) p / rho^obj.physConst.gamma;
     if entropyFn(p_R, rho_R) >= entropyFn(pBubble, rhoBubble)
-        error('Entropy decreased from port to bubble.')
+         warning('Entropy decreased from port to bubble.')
     end
 
     % Build the function for "Mach number consistent with
@@ -159,6 +177,7 @@ end
 % Select subsonic or sonic case for contraction flow (cross section area >
 % port area).
 function [qOut, caseKeyOut] = tryCasesContraction(qIn)
+% Check the sonic condition
 if pSonicFn(qIn) < pBubble
     caseKeyOut = 'subsonic';
     qOut = iterateToTol(...
@@ -188,14 +207,17 @@ end
 % Select subsonic or sonic case for expansion flow (cross section area >
 % port area).
 function [qOut, caseKeyOut] = tryCasesExpansion(qIn)
-if pSonicFn(qIn) < pBubble
+% Check the supersonic branch minimum pressure
+
+if obj.schm.p(qIn) / pBubble < ...
+        pMinSonic(APortExposed / obj.physConst.crossSectionalArea)
     caseKeyOut = 'subsonic';
     qOut = iterateToTol(...
         @processSubsonicCase, ...
         qIn, ...
         iterativeSolveTol);
 else
-    % Following code block is an alternative strategy for enforcing sonic
+    % The following code block is an alternative strategy for enforcing sonic
     % boundary conditions (although it doesn't seem to produce physical
     % results)
     if false
@@ -270,6 +292,11 @@ else
         * obj.physConst.APortTotal;
     % Clamp to [0, APortTotal]
     APortExposed = min([max([0, APortExposed]), obj.physConst.APortTotal]);
+    F = 1;
+    if isfield(obj.bubbleModel, 'flowreductionfactor')
+        F = obj.bubbleModel.flowreductionfactor;
+    end
+    APortExposed = APortExposed * F;
     
     % Compute initial q from q_R such that M_R as <= 1
     if M_R > 1
@@ -285,7 +312,9 @@ else
     end
     
     % Compute new q_R depending on boundary case
-    if APortExposed <= 1e-4 % port is closed, or close enough
+    if APortExposed <= 1e-4 || t <= 0 % port is closed, or close enough
+        % In case of t < 0, assume approximate equilibrium between gas in
+        % and leakage.
         % Kinematically-constrained case; no boundary values necessary
         % (wall closure used)
         caseKey = 'portClosed'; % Port is closed
@@ -383,6 +412,34 @@ else
     MEulerDomain = [];
 end
 
+%% Compute state at the port
+% 
+
+if ~REVERT_MODEL
+    if strcmpi('portClosed', caseKey)
+        p_outlet = pSonicFn(qPort);
+    else
+        Asonic_ = obj.physConst.crossSectionalArea / ...
+            areaMachFunction(obj.physConst.gamma, MPort);
+        if strcmpi('chamberChokedForced', caseKey)
+            gamma = obj.physConst.gamma;
+            M_outlet = 1;
+%             M_outlet = fzero( @(M) ...
+%                 ((gamma+1)/2)^(-(gamma+1)/2/(gamma-1)) * ...
+%                 (1 + (gamma-1)/2 * M^2 )^ ...
+%                 ((gamma+1)/2/(gamma-1)) ./ M - ...
+%                 APortExposed / Asonic_, ...
+%                 [1+1e-14,50]);
+        else
+            M_outlet = obj.machAreaFunction(APortExposed / Asonic_);
+        end
+        pStagnation = pPort / pressureMachFunction(obj.physConst.gamma, MPort);
+        p_outlet = pStagnation * pressureMachFunction(obj.physConst.gamma, M_outlet);
+    end
+else
+    p_outlet = pPort;
+end
+
 %% Shuttle detailed state
 if length(shuttle) >= 2
 [~, ~, ~, ~, subsystemState] = shuttleEvolve(shuttle, ...
@@ -404,7 +461,8 @@ portStates = struct( ...
     'ARatio', APortExposed / obj.physConst.crossSectionalArea, ...
     'qPort', qPort, ...
     'wPort', wPort, ...
-    'pSonicPort', pSonicPort ...
+    'pSonicPort', pSonicPort, ...
+    'p_outlet', p_outlet ...
 );
 eulerDomainStates = struct(...
     'rho', rhoEulerDomain, ...

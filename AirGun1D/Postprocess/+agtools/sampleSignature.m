@@ -80,6 +80,7 @@ funcs = struct( ...
     'VFn', VFn, ...
     'VDotFn', VDotFn, ...
     'VDotDotFn', VDotDotFn, ...
+    'pressureDirect', pressureDirect, ...
     'pFn', pressureSignalFnTotal ...
 );
 end
@@ -88,7 +89,7 @@ function R = bubbleRadiusFn(solution, t, qSize)
     R = nan(size(t));
     
     for i = 1:length(t)
-        if t(i) < 0
+        if t(i) < solution.soln.x(1)
             % Initial quiescent signal
             R(i) = solution.bubbleContinuationState(1);
         elseif t(i) <= solution.soln.x(end)
@@ -108,7 +109,7 @@ function RDot = bubbleVelocityFn(solution, t, qSize)
     RDot = nan(size(t));
     
     for i = 1:length(t)
-        if t(i) < 0
+        if t(i) < solution.soln.x(1)
             % Initial quiescent signal
             RDot(i) = 0;
         elseif t(i) <= solution.soln.x(end)
@@ -129,7 +130,7 @@ function RDotDot = bubbleAccelFn(solution, t, qSize)
     RDotDot = nan(size(t));
     
     for i = 1:length(t)
-        if t(i) < 0
+        if t(i) < solution.soln.x(1)
             % Initial quiescent signal
             RDotDot(i) = 0;
         elseif t(i) <= solution.soln.x(end)

@@ -41,7 +41,8 @@ A_R = physConst.shuttle_area_right;
 
 % Mid chamber
 midChamberLength = physConst.midChamberLength;
-A_Mid = physConst.shuttle_area_right_rear;
+% A_Mid = physConst.shuttle_area_right_rear;
+A_Mid = A_L;
 pAmbient = physConst.p_inf;
 
 vol_mid = A_Mid * (midChamberLength - z(1));
@@ -139,11 +140,11 @@ elseif isfield(physConst, 'dampingConstant')
 else
     dampingConstant = 2.5e4;
 end
-% Replace with acoustic impedance is available
+% Replace with acoustic impedance if available
 if nargin >= 5
     dampingConstant = Z_L * physConst.shuttle_area_left;
     % Slow piston rarefaction limit factor on p_I?
-    pFactor = 0.279;
+%     pFactor = 0.279;
 end
 
 linearDamping = - dampingConstant * z(2);
@@ -164,8 +165,8 @@ netForce = ...
 % 0 ~ freezeDistance: no flow allowed
 % freezeDistance ~ limitDistance: flow efficiency proportional to
 %                                 x - freezeDistance
-limitDistance = 0.1*0.30 * physConst.midChamberLength;
-freezeDistance = 0.1*0.03 * physConst.midChamberLength;
+limitDistance = 0.10 * physConst.midChamberLength;
+freezeDistance = 0.01 * physConst.midChamberLength;
 rearVolRatio = (z(1) - freezeDistance) / ...
     (limitDistance - freezeDistance);
 rearVolRatio = max(0, rearVolRatio);
@@ -211,7 +212,9 @@ subsystemState = struct('opChamberRear_m', m_rear, ...
                         'shuttle_velocity', z(2), ...
                         'shuttle_acceleration', dz(2), ...
                         'shuttle_force', netForce, ...
-                        'physConst', physConst);
+                        'physConst', physConst, ...
+                        'flowefficiency', flowefficiency ...
+                        );
 return
 
 %% Legacy damping forces

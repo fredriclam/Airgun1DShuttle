@@ -22,7 +22,11 @@ addpath ..\sbplib
 % Simulation window [s]
 % Suggested values:
 % [0, and 0.100 to 0.600 s]
-tspan = [0; 0.300];
+if nargin >= 3 && isfield(options, "leakTime")
+    tspan = [-options.leakTime, 0.300];
+else
+    tspan = [0; 0.300];
+end
 % Set flag for running shuttle-free model
 runShuttleFreeFlag = false;
 
@@ -90,6 +94,7 @@ airgunLength = airgunVolume / ...
     airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
 airgunPortArea = airgunPortAreaRatio * ...
     pi * airgunOuterDiameter * airgunPortLength;  % Effective port area [in^2]
+airgunPortArea = 90; % Measured port area override [in^2]
 
 %% Housekeeping: Data packing
 paramAirgun = struct(...

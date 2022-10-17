@@ -1,7 +1,7 @@
 % Plots energy distribution for reference case
 % Uses some hard-coded parameter values valid for the reference case.
 
-function plotEnergyDistro(solution, metadata)
+function [Z, exports] = plotEnergyDistro(solution, metadata)
 % Replace legacy variable name
 data = solution;
 
@@ -82,6 +82,9 @@ mid.m = mid.rho0 * subsystemState.midChamber_area * ...
     subsystemState.midChamber_length ;
 mid.E = mid.m * metadata.discretization.physConst.c_v * mid.T;
 
+% Acoustic impedance for damping
+Z = 0;
+
 % Compute bubble energy rates (need to be integrated)
 for i = 1:size(data.shuttle,2)
     fS = fullState( ... 
@@ -93,16 +96,20 @@ for i = 1:size(data.shuttle,2)
     bubbleInterface.dEin(i) = fS.bubbleStates.dEin;
     flangeInterface.dW(i) = fS.portStates.pPort * data.shuttle(2,i) ...
         * metadata.discretization.physConst.shuttle_area_left;
+    Z(i) = fS.portStates.rhoPort * fS.portStates.cPort ...
+        * metadata.discretization.physConst.shuttle_area_left;
 end
 
 % Damping work rate
-linearDampingWorkRate = 2.5e4*data.shuttle(2,:).^2;
+linearDampingWorkRate = Z .* data.shuttle(2,:).^2;
+% linearDampingWorkRate = 2.5e4*data.shuttle(2,:).^2;
 
 % Integrate work rate and heat transfer across bubble interface
 bubbleInterface.Q = 0;
 bubbleInterface.work = 0;
 bubbleInterface.Ein = 0;
 bubbleInterface.acousticEnergy = 0;
+bubbleInterface.wateralphadamping = 0;
 flangeInterface.W = 0;
 linearDampingWork = 0;
 
@@ -130,6 +137,10 @@ for i = 2:size(data.shuttle,2)
     flangeInterface.W(i) = flangeInterface.W(i-1) ...
         + 0.5*(flangeInterface.dW(i) + flangeInterface.dW(i-1)) ...
              *(tAxis(i)-tAxis(i-1));
+    bubbleInterface.wateralphadamping(i) = ...
+        bubbleInterface.wateralphadamping(i-1) ...
+        + 0.5*( alpha * rho_inf * 4*pi * R^2 * Rdot^2) ...
+        *(tAxis(i)-tAxis(i-1));
     linearDampingWork(i) = linearDampingWork(i-1) ...
         + 0.5*(linearDampingWorkRate(i) + linearDampingWorkRate(i-1)) ...
              *(tAxis(i)-tAxis(i-1));
@@ -171,7 +182,10 @@ for i = 2:size(data.shuttle,2)
     mid.W(i) = mid.W(i-1) + mid.dW(i-1);% * tAxis_dt(i-1);
 end
 
-figure(775); clf;
+%% Generate tiledlayout
+tL = tiledlayout(13,2);
+
+nexttile(tL, 1, [5,1])
 kiloscale = 1e-3;
 % Energy amounts
 energies = { ...
@@ -189,8 +203,21 @@ energies = { ...
      (max(flangeInterface.W(1:100:end))-flangeInterface.W(1:100:end))...
          *kiloscale, ...
      linearDampingWork(1:100:end)*kiloscale, ...
-     -mid.W(1:100:end)*kiloscale ...
+     data.shuttle(8,1:100:end)*kiloscale ... % -mid.W(1:100:end)*kiloscale ... % work total on mid region
     };
+initialenergy = rear.E(1) ...
+    + front.E(1) ...
+    + shuttleKineticEnergy(1) ...
+    + fchamber.total.EThermal(1) ...
+    + fchamber.total.EKinetic(1) ...
+    + bubble_energy(1) ...
+    - min(bubbleInterface.Q(1:100:end)) ...
+    + bubbleInterface.Q(1) ...
+    + bubbleInterface.work(1) ...
+    + max(flangeInterface.W(1:100:end)) ...
+    - flangeInterface.W(1) ...
+    + linearDampingWork(1) ...
+    + data.shuttle(8,1); %- mid.W(1);
 labels = {...
     'Region III energy', ...
     'Region IV energy', ...
@@ -224,16 +251,16 @@ end
 
 splitFillMulti(1e3*tAxis(1:100:end), ...
     energiesSorted);
-legend(labelsSorted, 'location', 'eastoutside', 'Interpreter', 'latex', ...
+legend(labelsSorted, 'location', 'eastoutside', 'Interpreter', 'tex', ...
     'FontSize', 13)
 
 ax1 = gca;
-ax1.XAxis.Label.Interpreter = 'latex';
-ax1.XAxis.Label.String = '$t$ (ms)';
-ax1.YAxis.Label.Interpreter = 'latex';
-ax1.YAxis.Label.String = '$E$ (kJ)';
-ax1.TickLabelInterpreter = 'latex';
-ax1.FontSize = 13;
+ax1.XAxis.Label.Interpreter = 'tex';
+ax1.XAxis.Label.String = '{\it{t}} (ms)';
+ax1.YAxis.Label.Interpreter = 'tex';
+ax1.YAxis.Label.String = '{\it{E}} (kJ)';
+ax1.TickLabelInterpreter = 'tex';
+ax1.FontSize = 14;
 ax1.XAxis.MinorTick = 'on';
 ax1.YAxis.MinorTick = 'on';
 ax1.LineWidth = 1.;
@@ -244,20 +271,21 @@ set(gcf,'position', [118   669   708   313]);
 drawnow;
 
 %% Part II (zoom in on small energies)
-figure(776); clf;
+% figure(776); clf;
+nexttile(tL, 2, [5,1])
 
 splitFillMulti(1e3*tAxis(1:100:end), ...
     energiesSorted(6:end), 6-1);
 legend(labelsSorted(6:end), 'location', 'eastoutside', ...
-    'Interpreter', 'latex', ...
+    'Interpreter', 'tex', ...
     'FontSize', 13)
 
 ax1 = gca;
-ax1.XAxis.Label.Interpreter = 'latex';
-ax1.XAxis.Label.String = '$t$ (ms)';
-ax1.YAxis.Label.Interpreter = 'latex';
-ax1.YAxis.Label.String = '$E$ (kJ)';
-ax1.TickLabelInterpreter = 'latex';
+ax1.XAxis.Label.Interpreter = 'tex';
+ax1.XAxis.Label.String = '{\it{t}} (ms)';
+ax1.YAxis.Label.Interpreter = 'tex';
+ax1.YAxis.Label.String = '{\it{E}} (kJ)';
+ax1.TickLabelInterpreter = 'tex';
 ax1.FontSize = 13;
 ax1.XAxis.MinorTick = 'on';
 ax1.YAxis.MinorTick = 'on';
@@ -269,7 +297,8 @@ set(gcf,'position', [467   664   634   315]);
 drawnow;
 
 %% Long-time bubble energies
-figure(777); clf;
+% figure(777); clf;
+nexttile(tL, 11, [4,2])
 
 bubbleLong.Q = bubbleInterface.Q;
 bubbleLong.work = bubbleInterface.work;
@@ -313,13 +342,40 @@ for i = (1+size(data.q,2)):size(data.bubbleContinuationState,2)
              *(tAxisLong(i)-tAxisLong(i-1));
 end
 
+% Integrating acoustic radiation energy from bubble eqn consistent formula
+bubbleLong.radiatedEnergyTrue = 0;
+bubbleLong.p = (metadata.discretization.physConst.gamma - 1) ...
+    * data.bubbleContinuationState(4,:) ...
+    ./ (4/3 * pi * data.bubbleContinuationState(1,:).^3);
+for i = 2:size(data.bubbleContinuationState,2)
+    % First-order estimate of p-dot
+    pdot_bubble = (bubbleLong.p(i) - bubbleLong.p(i-1)) ...
+        / (tAxisLong(i)-tAxisLong(i-1));
+    radiatedEnergyTrueIntegrand = ...
+        - 4*pi / metadata.discretization.physConst.c_inf ...
+        * data.bubbleContinuationState(1,i).^3 ... % R^3
+        * data.bubbleContinuationState(2,i) ... % Rdot
+        * pdot_bubble;
+    bubbleLong.radiatedEnergyTrue(i) = bubbleLong.radiatedEnergyTrue(i-1) ...
+        + radiatedEnergyTrueIntegrand ...
+             *(tAxisLong(i)-tAxisLong(i-1));
+end
+
 bubbleLong.E = data.bubbleContinuationState(4,:);
+
+otherEnergy = initialenergy - ( ...
+    bubbleLong.E ...
+    + bubbleLong.work...
+    + (-min(bubbleInterface.Q(1:100:end))+ ...
+      bubbleLong.Q)...
+    );
 
 energiesLong = { ...
     bubbleLong.E(1:3:end)*kiloscale, ...
     bubbleLong.work(1:3:end)*kiloscale, ...
     (-min(bubbleInterface.Q(1:100:end))+ ...
       bubbleLong.Q(1:3:end))*kiloscale, ...
+    otherEnergy(1:3:end)*kiloscale ...
 };
 
 % for i = 1:3
@@ -328,15 +384,15 @@ energiesLong = { ...
 % end
 
 splitFillMulti(tAxisLong(1:3:end), ...
-    energiesLong(1:3),2);
+    energiesLong(1:4),2);
 xlim([0,3])
 
 ax1 = gca;
-ax1.XAxis.Label.Interpreter = 'latex';
-ax1.XAxis.Label.String = '$t$ (s)';
-ax1.YAxis.Label.Interpreter = 'latex';
-ax1.YAxis.Label.String = '$E$ (kJ)';
-ax1.TickLabelInterpreter = 'latex';
+ax1.XAxis.Label.Interpreter = 'tex';
+ax1.XAxis.Label.String = '{\it{t}} (s)';
+ax1.YAxis.Label.Interpreter = 'tex';
+ax1.YAxis.Label.String = '{\it{E}} (kJ)';
+ax1.TickLabelInterpreter = 'tex';
 ax1.FontSize = 13;
 ax1.XAxis.MinorTick = 'on';
 ax1.YAxis.MinorTick = 'on';
@@ -345,7 +401,8 @@ ax1.LineWidth = 1.;
 set(gcf,'position', [87   360   805   268]);
 
 %%
-figure(778); clf;
+% figure(778); clf;
+nexttile(tL, 19, [4,2])
 % bubbleInterface.totalWaterKinetic = ...
 %     bubbleInterface.work - ...
 %     bubbleInterface.acousticEnergy;
@@ -353,12 +410,17 @@ figure(778); clf;
 bubbleLong.waterKineticEnergy = -(1 / (4*pi) * 1000 / 1482 ) * ...
     funcs.VDotDotFn(tAxisLong) .* funcs.VDotFn(tAxisLong);
 
+% splitFillMulti(tAxisLong(1:3:end), ...
+%     { ...
+%         bubbleLong.acousticEnergy(1:3:end)*kiloscale + ...
+%         bubbleLong.waterKineticEnergy(1:3:end)*kiloscale, ...
+%     }, ...
+%     12);
 splitFillMulti(tAxisLong(1:3:end), ...
     { ...
-        bubbleLong.acousticEnergy(1:3:end)*kiloscale + ...
-        bubbleLong.waterKineticEnergy(1:3:end)*kiloscale, ...
+    bubbleLong.radiatedEnergyTrue(1:3:end)*kiloscale ...
     }, ...
-    12);
+12);
 % legend(["Water kinetic", "Water acoustic"], 'location', 'eastoutside', ...
 %     'Interpreter', 'latex', ...
 %     'FontSize', 13)
@@ -366,18 +428,28 @@ splitFillMulti(tAxisLong(1:3:end), ...
 xlim([0, 3])
 
 ax1 = gca;
-ax1.XAxis.Label.Interpreter = 'latex';
-ax1.XAxis.Label.String = '$t$ (s)';
-ax1.YAxis.Label.Interpreter = 'latex';
-ax1.YAxis.Label.String = '$E$ (kJ)';
-ax1.TickLabelInterpreter = 'latex';
+ax1.XAxis.Label.Interpreter = 'tex';
+ax1.XAxis.Label.String = '{\it{t}} (s)';
+ax1.YAxis.Label.Interpreter = 'tex';
+ax1.YAxis.Label.String = '{\it{E}} (kJ)';
+ax1.TickLabelInterpreter = 'tex';
 ax1.FontSize = 13;
 ax1.XAxis.MinorTick = 'on';
 ax1.YAxis.MinorTick = 'on';
 ax1.LineWidth = 1.;
 
-
 set(gcf,'position', [87    96   808   233]);
+
+% Pack exports
+exports = struct();
+exports.bubbleInterface = bubbleInterface;
+exports.bubbleLong = bubbleLong;
+exports.rear = rear;
+exports.front = front;
+exports.shuttleKineticEnergy = shuttleKineticEnergy;
+exports.fchamber = fchamber;
+exports.bubble_energy = bubble_energy;
+exports.linearDampingWork = linearDampingWork;
 
 end
 

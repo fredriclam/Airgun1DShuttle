@@ -82,6 +82,8 @@ function [solution, metadata] = ...
     elseif isstruct(bubbleModel)
         if strcmpi('partition', bubbleModel.type)
             bubble0 = [bubble0; 0];
+        elseif isfield(bubbleModel, 'waterProperties')
+            bubble0 = [bubble0; 0];
         end 
     else
         error('Unknown bubble model')
@@ -116,9 +118,9 @@ function [solution, metadata] = ...
         
         %% Repack state
         if coupleToShuttle
-            dy = [dq; dBubble; dShuttle];
+            dy = [(t>=0)*dq; dBubble; (t>=0)*dShuttle];
         else
-            dy = [dq; dBubble];
+            dy = [(t>=0)*dq; dBubble];
         end
 
         %% Plot every PLOT_INTERVAL
@@ -179,7 +181,24 @@ function [solution, metadata] = ...
     % Set ODE solver options
     options = odeset('RelTol',REL_TOL);
     figure(99);
-    sol_ode = ode23(@odefun, tspan, y0,options);
+    % Split ode solve
+    if tspan(1) < 0
+        % Compute max wave speed
+        gamma = discretization.physConst.gamma;
+        h = discretization.h;
+        w_max0 = 2 * max( ...
+            sqrt(gamma * (gamma - 1) * ( ...
+            q0(3:3:end) ./ q0(1:3:end) ...
+            - 0.5*q0(2:3:end).^2 ./ q0(1:3:end).^2)));
+        % ODE splitting to prevent stiffness in dy
+        tspan1 = [tspan(1), 0];
+        tspan2 = [0, tspan(2)];
+        sol_ode = ode45(@odefun, tspan1, y0,options);
+        options = odeset('RelTol',REL_TOL,'MaxStep',h/w_max0);
+        sol_ode = odextend(sol_ode, @odefun, tspan2(2), sol_ode.y(:,end), options);
+    else
+        sol_ode = ode45(@odefun, tspan, y0,options);
+    end
 
     fprintf('ODE solve complete for coupled phase ([%.3f, %.3f] s).\n', ...
         tspan(1), tspan(2));

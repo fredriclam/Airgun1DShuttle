@@ -136,7 +136,7 @@ tLNest.Layout.TileSpan = [1, 3];
 ax1 = axes(tLNest);
 splitFillGraph(1e3*tAxis(1:10:end), ...
     0*fill_botContour(1:10:end), fill_botContour(1:10:end), fill_topContour(1:10:end));
-massLimits = max(fill_topContour);
+massLimits = max([0.5, max(fill_topContour)]);
 ylim([0, massLimits]);
 
 % Plot shuttle position on axes set 2
@@ -154,7 +154,7 @@ plot(1e3*tAxis(1:100:end), nondimShuttlePos(1:100:end), '-', ...
 hold off
 legend({'Front of shuttle', 'Behind shuttle', ...
         'Normalized shuttle position'}, ...
-    'FontSize', 12, 'Interpreter', 'latex')
+    'FontSize', 12) %,'Interpreter', 'latex')
 
 ax1.Box = 'off';
 ax2.Box = 'off';
@@ -162,20 +162,30 @@ ax2.YAxisLocation = 'right';
 ax2.Color = 'none';
 ax2.YAxis.Limits = [0, 1];
 
-ax1.XAxis.Label.String = '$t$ [ms]';
-ax1.XAxis.Label.Interpreter = 'latex';
+ax1.XAxis.Label.String = '{\it{t}} (ms)';
+% ax1.XAxis.Label.Interpreter = 'latex';
 ax1.XAxis.Label.FontSize = 15;
-ax1.YAxis.Label.String = '$m$ [kg]';
-ax1.YAxis.Label.Interpreter = 'latex';
+ax1.YAxis.Label.String = '{\it{m}} (kg)';
+% ax1.YAxis.Label.Interpreter = 'latex';
 ax1.YAxis.Label.FontSize = 15;
-ax2.YAxis.Label.String = '$\xi / \xi_\mathrm{max}$';
-ax2.YAxis.Label.Interpreter = 'latex';
+ax2.YAxis.Label.String = '\xi / \xi_{max}';
+% ax2.YAxis.Label.Interpreter = 'latex';
 ax2.YAxis.Label.FontSize = 15;
 ax2.XAxis.TickLabels = {};
+% ax1.XAxis.Label.String = '$t$ [ms]';
+% ax1.XAxis.Label.Interpreter = 'latex';
+% ax1.XAxis.Label.FontSize = 15;
+% ax1.YAxis.Label.String = '$m$ [kg]';
+% ax1.YAxis.Label.Interpreter = 'latex';
+% ax1.YAxis.Label.FontSize = 15;
+% ax2.YAxis.Label.String = '$\xi / \xi_\mathrm{max}$';
+% ax2.YAxis.Label.Interpreter = 'latex';
+% ax2.YAxis.Label.FontSize = 15;
+% ax2.XAxis.TickLabels = {};
 
-ax1.TickLabelInterpreter = 'latex';
+% ax1.TickLabelInterpreter = 'latex';
 ax1.FontSize = 13;
-ax2.TickLabelInterpreter = 'latex';
+% ax2.TickLabelInterpreter = 'latex';
 ax2.FontSize = 13;
 
 ax1.XAxis.MinorTick = 'on';
@@ -202,12 +212,14 @@ plot(1e3*profileLength, xiRange/max(xiRange), 'LineWidth', 1.5, ...
 ax3 = gca;
 ax3.YAxis.Limits = [0, 1];
 ax3.XAxis.Limits = [0, 10];
-ax3.TickLabelInterpreter = 'latex';
+% ax3.TickLabelInterpreter = 'latex';
 ax3.FontSize = 13;
 ax3.YAxis.MinorTick = 'on';
 ax3.LineWidth = 1;
-ax3.XAxis.Label.String = '$\Delta r$ [mm]';
+ax3.XAxis.Label.String = '$\Delta r$ (mm)';
 ax3.XAxis.Label.Interpreter = 'latex';
+% ax3.XAxis.Label.String = '\Delta {\it{r}} (mm)';
+% ax3.XAxis.Label.Interpreter = 'latex';
 ax3.XAxis.Label.FontSize = 15;
 grid on
 
@@ -232,19 +244,29 @@ hold off
 ylim([0, 12])
 
 legend({'Front of shuttle', 'Behind shuttle', 'Initial'}, ...
-    'FontSize', 12, 'Interpreter', 'latex')
+    'FontSize', 12)%, 'Interpreter', 'latex')
 
 ax1 = gca;
-ax1.XAxis.Label.String = '$t$ [ms]';
-ax1.XAxis.Label.Interpreter = 'latex';
+ax1.XAxis.Label.String = '{\it{t}} (ms)';
+% ax1.XAxis.Label.Interpreter = 'latex';
 ax1.XAxis.Label.FontSize = 15;
-ax1.YAxis.Label.String = '$p$ [MPa]';
-ax1.YAxis.Label.Interpreter = 'latex';
+ax1.YAxis.Label.String = '{\it{p}} (MPa)';
+% ax1.YAxis.Label.Interpreter = 'latex';
 ax1.YAxis.Label.FontSize = 15;
-ax1.TickLabelInterpreter = 'latex';
+% ax1.TickLabelInterpreter = 'latex';
 ax1.FontSize = 13;
 ax1.XAxis.MinorTick = 'on';
 ax1.YAxis.MinorTick = 'on';
+% ax1.XAxis.Label.String = '$t$ [ms]';
+% ax1.XAxis.Label.Interpreter = 'latex';
+% ax1.XAxis.Label.FontSize = 15;
+% ax1.YAxis.Label.String = '$p$ [MPa]';
+% ax1.YAxis.Label.Interpreter = 'latex';
+% ax1.YAxis.Label.FontSize = 15;
+% ax1.TickLabelInterpreter = 'latex';
+% ax1.FontSize = 13;
+% ax1.XAxis.MinorTick = 'on';
+% ax1.YAxis.MinorTick = 'on';
 ax1.LineWidth = 1.;
 ax2.LineWidth = 1.;
 

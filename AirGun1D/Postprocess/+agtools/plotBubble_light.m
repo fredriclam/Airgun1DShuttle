@@ -35,7 +35,7 @@ pBubbleInlet(pBubblePortChoked > pBubbleThermo) = ...
 
 plotStep = 10;
 global_format = @() set(gca, 'FontSize', 14, ...
-    'TickLabelInterpreter', 'latex', ...
+    'TickLabelInterpreter', 'tex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on', ...
     'LineWidth', 1);
 
@@ -43,8 +43,8 @@ nexttile(tL, 1, [1,1])
 plot(1e3*t(1:plotStep:7000), bubbleMass(1:plotStep:7000), 'k-', ...
      'LineWidth', 1, 'Color', lineColor)
 xlim([0,15])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$m$ [kg]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'Interpreter', 'tex', 'FontSize', 14)
+ylabel ('{\it{m}} (kg)', 'Interpreter', 'tex', 'FontSize', 14)
 set(gca,'XMinorTick','on', 'YMinorTick', 'on', 'LineWidth', 1)
 global_format()
 set(gca,'TickLength',1.5*[0.01, 0.025])
@@ -54,8 +54,8 @@ nexttile(tL, 2, [1,1])
 plot(1e3*t(1:plotStep:7000), funcs.VDotDotFn(t(1:plotStep:7000)), 'k-', ...
      'LineWidth', 1, 'Color', lineColor)
 xlim([0,15])
-xlabel('$t$ [ms]', 'Interpreter', 'latex', 'FontSize', 14)
-ylabel ('$\ddot{V}$ [m${}^3$/s${}^2$]', 'Interpreter', 'latex', 'FontSize', 14)
+xlabel('{\it{t}} (ms)', 'Interpreter', 'tex', 'FontSize', 14)
+ylabel ('$\ddot{V}$ (m${}^3$/s${}^2$)', 'Interpreter', 'latex', 'FontSize', 14)
 global_format()
 set(gca,'TickLength',1.5*[0.01, 0.025])
 hold on

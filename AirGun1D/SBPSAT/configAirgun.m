@@ -172,6 +172,25 @@ switch str
         icBubble.m = p*bubbleInitialVolumeMetric / (Q*T); 
         icBubble.E = icBubble.m * c_v * T;
         
+        is_icBubbleModified = false;
+        if isfield(extraOptions, 'R')
+            icBubble.R = extraOptions.R;
+            disp('Using extra option -- R');
+            is_icBubbleModified = true;
+        end
+        if isfield(extraOptions, 'Rdot')
+            icBubble.Rdot = extraOptions.Rdot;
+            disp('Using extra option -- Rdot');
+            is_icBubbleModified = true;
+        end
+        if isfield(extraOptions, 'pb')
+            pb = extraOptions.pb;
+            icBubble.m = pb*(4/3*pi*icBubble.R^3) / (Q*T); 
+            icBubble.E = icBubble.m * c_v * T;
+            disp('Using extra option -- pb');
+            is_icBubbleModified = true;
+        end
+        
         % Convert cross sectional area from [in^2] to [m^2]
         physConst.crossSectionalArea = airgunCrossSectionalArea*0.00064516;
         % Set left pressure = right pressure
@@ -213,7 +232,7 @@ switch str
 %         physConst.shuttle_area_left = pi/4 * (11.2 * 0.0254)^2; % [m^2]
         % Actual:
         physConst.shuttle_area_left = 0.04735; % [m^2]
-       
+        
         %% Front of shuttle (flange): projected area
         % Estimate:
 %         physConst.shuttle_area_right = pi/4 * ( ...
@@ -230,6 +249,7 @@ switch str
         % Lead-in length where shuttle can move without exposing the air
         physConst.portLead = 0.0; % [m]
         
+        % (Unused) thickness of the flane in the operating chamber
         physConst.flangeDepth = 3 * 0.0254; % [m]
         % Approximate the flange ID to be equal to the chamber
         

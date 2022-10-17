@@ -93,7 +93,7 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 gasMassPartitionRatio = 1;
                 massOpChamber = 0;
             else
-                xi_0 = 0.1e-3;
+                xi_0 = 5*1.0e-3;
                 gasMassPartitionRatio = ...
                     obj.chambers.rearVolume(xi_0) / ...
                     obj.chambers.totalVolume();
@@ -169,13 +169,17 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                 % Compute shuttle state evolution
                 % Early data: should be initial ~80g accel
                 if ~REVERT_MODEL
-                    % TODO: fix interface for shuttle
+                    % Compute acoustic impedance rho*c at x = 0
+%                     agState.
+                    Z = agState.portStates.rhoPort * agState.portStates.cPort;
                     % Send boundary pressure to shuttle assembly
                     [dShuttle, pShutRear, pShutFront, pMid, ~] = ...
                         shuttleEvolve(...
                         ...shuttle, agState.eulerDomainStates.p_R, ...
-                        shuttle, agState.portStates.pPort, ...
-                        physConst, obj.chambers);
+                        shuttle, ...
+                        agState.portStates.pPort, ... % Using the p(x=0) pressure
+                        ...agState.portStates.p_outlet, ... % Using the port pressure
+                        physConst, obj.chambers, Z);
                 else
                     dShuttle = 0*shuttle;
                 end
@@ -262,7 +266,8 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                     if agState.portStates.APortExposed == 0 ...
                             || abs(agState.eulerDomainStates.M_R) < 1e-6 % TODO: remove M_R condition
                         if obj.bubbleFrozen
-                            dBubble = zeros(size(dBubble));
+                            % Removed for leak problem
+%                             dBubble = zeros(size(dBubble));
                         end
                     else
                         obj.bubbleFrozen = false;

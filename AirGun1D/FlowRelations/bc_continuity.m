@@ -270,3 +270,217 @@ plot( [pS.APortExposed] ./ ...
       [pS.pPort] ./ [bS.p], ...
       'm-', 'LineWidth', 1.5);
 hold off
+
+%% Grid and target values
+figure(56); clf;
+
+hat_ranges = struct();
+hat_ranges.data = linspace(2/(gamma-1), 8, 100);
+hat_ranges.AR = linspace(0,2,100);
+meshgrids = struct();
+[meshgrids_ranges.data, meshgrids_ranges.AR] = ...
+    meshgrid(hat_ranges.data, hat_ranges.AR);
+
+eqn_grid2target = @(data, Pi, areaRatio) data - Pi.^((gamma-1)/(2*gamma)) ...
+    .* (sqrt( ...
+        2/(gamma-1)*(1-Pi.^((gamma-1)/gamma)) ...
+        ./(Pi.^((gamma-1)/gamma)-Pi.^((gamma+1)/gamma) ./ areaRatio.^2)) ...
+    + 2/(gamma-1));
+PiHat = @(data, areaRatio) fsolve(@(Pi) eqn_grid2target(data,Pi,1.2), 1);
+
+PiHats = nan(size(meshgrids_ranges.data));
+flagsPiHats = nan(size(meshgrids_ranges.data));
+for i = 1:length(hat_ranges.AR)
+    for j = 1:length(hat_ranges.data)
+        
+        if true
+            [PiHats(i,j), ~, flagsPiHats(i,j)] = fzero( ...
+            @(Pi) eqn_grid2target(hat_ranges.data(j),Pi,hat_ranges.AR(i)), [1,100]);
+        end
+        if false
+            [PiHats(i,j), ~, flagsPiHats(i,j)] = fsolve( ...
+                @(Pi) eqn_grid2target(hat_ranges.data(j),Pi,hat_ranges.AR(i)), 10, ...
+                optimoptions('fsolve','Display','off','OptimalityTolerance', 1e-6));
+            if flagsPiHats(i,j) ~= 1
+                [PiHats(i,j), ~, flagsPiHats(i,j)] = fzero( ...
+                @(Pi) eqn_grid2target(hat_ranges.data(j),Pi,hat_ranges.AR(i)), [1,100]);
+            end
+        end
+        
+%         if flagsPiHats(i,j) ~= 1
+%             [PiHats(i,j), ~, flagsPiHats(i,j)] = fsolve( ...
+%             @(Pi) eqn_grid2target(hat_ranges.data(j),Pi,hat_ranges.AR(i)), 1, ...
+%             optimoptions('fsolve','Display','off','OptimalityTolerance', 1e-6));
+%         end
+%         if flagsPiHats(i,j) ~= 1
+%             [PiHats(i,j), ~, flagsPiHats(i,j)] = fsolve( ...
+%             @(Pi) eqn_grid2target(hat_ranges.data(j),Pi,hat_ranges.AR(i)), 0.1, ...
+%             optimoptions('fsolve','Display','off','OptimalityTolerance', 1e-6));
+%         end
+    end
+end
+
+PiHats(flagsPiHats ~= 1) = NaN;
+for i = 1:size(PiHats,1)
+    for j = 1:size(PiHats,2)
+        if ~isreal(PiHats(i,j))
+            PiHats(i,j) = NaN;
+        end
+    end
+end
+
+MR_of_PiHats = sqrt( ...
+    2/(gamma-1)*(1-PiHats.^((gamma-1)/gamma)) ...
+    ./ (PiHats.^((gamma-1)/gamma)-PiHats.^((gamma+1)/gamma) ./ meshgrids_ranges.AR.^2));
+for i = 1:size(MR_of_PiHats,1)
+    for j = 1:size(MR_of_PiHats,2)
+        if ~isreal(MR_of_PiHats(i,j))
+            MR_of_PiHats(i,j) = NaN;
+        end
+    end
+end
+
+
+subplot(1,2,1);
+contourf(meshgrids_ranges.data, meshgrids_ranges.AR, PiHats, 'LevelStep', 0.2);
+xlabel("$(p_R / p_b)^\frac{\gamma-1}{2 \gamma} (M_R + \frac{2}{\gamma-1})$", ...
+    'Interpreter', 'latex')
+ylabel("$A_{port}/A_{cs}$", 'Interpreter', 'latex')
+colorbar
+title ('$\hat{p} / p_b$', 'Interpreter', 'latex')
+subplot(1,2,2);
+contourf(meshgrids_ranges.data, meshgrids_ranges.AR, MR_of_PiHats)
+title ('$\hat{M}$', 'Interpreter', 'latex')
+xlabel("$(p_R / p_b)^\frac{\gamma-1}{2 \gamma} (M_R + \frac{2}{\gamma-1})$", ...
+    'Interpreter', 'latex')
+ylabel("$A_{port}/A_{cs}$", 'Interpreter', 'latex')
+colorbar
+
+%% Compute hats in terms of grid
+
+hat_ranges = struct();
+hat_ranges.M = linspace(0, 2, 100);
+hat_ranges.p = linspace(0, 4, 200);
+meshgrids = struct();
+[meshgrids_ranges.M, meshgrids_ranges.p] = ...
+    meshgrid(hat_ranges.M, hat_ranges.p);
+meshgrids_ranges.data = meshgrids_ranges.p.^((gamma-1)/(2*gamma)) ...
+    .* (meshgrids_ranges.M + 2/(gamma-1));
+AR = 0.8;
+
+PiHats_2 = nan(size(meshgrids_ranges.data));
+for i = 1:size(meshgrids_ranges.data,1)
+    for j = 1:size(meshgrids_ranges.data,2)
+            [PiHats_2(i,j), ~, flagsPiHats_2(i,j)] = fsolve( ...
+            @(Pi) eqn_grid2target(meshgrids_ranges.data(i,j), ...
+                Pi, ...
+                AR), 1);
+    end
+end
+
+%% Monotonic non-injective grid search
+M_locus = [];
+for j = 1:size(meshgrids_ranges.data,2)
+    M_on_curve = hat_ranges.M(1);
+    for i = 1:size(PiHats_2,1)
+        if PiHats_2(i,j) < hat_ranges.p(j)
+            M_on_curve = hat_ranges.M(i);
+        elseif i > 1
+            M_on_curve = hat_ranges.M(i-1) + ...
+                (hat_ranges.M(i) - hat_ranges.M(i-1)) / ...
+                (PiHats_2(i,j) - PiHats_2(i-1,j)) * ...
+                (hat_ranges.p(j) - PiHats_2(i-1,j));
+            break
+        else
+            break
+        end
+    end
+    M_locus(j) = M_on_curve;
+end
+
+%% Plot
+figure(57); clf;
+subplot(1,2,1);
+contourf(meshgrids_ranges.M, meshgrids_ranges.p, PiHats_2, ...
+    'levelstep', 0.5, 'linestyle', 'none')
+cb = colorbar;
+cb.Label.Interpreter = 'latex';
+cb.Label.String = '$\hat{p} / p_b$';
+cb.Label.FontSize = 14;
+xlabel  'M_R'
+ylabel 'p_R / p_b'
+title ("A_{port} / A_{cs} = " + AR)
+
+hold on
+% plot(M_locus, hat_ranges.p, '.w');
+hold off
+
+subplot(1,2,2);
+contourf(meshgrids_ranges.M, meshgrids_ranges.p, PiHats_2, ...
+    'levelstep', 0.5, 'linestyle', 'none')
+PiHat2MHat = @(Pi) sqrt( ...
+        2/(gamma-1)*(1-Pi.^((gamma-1)/gamma)) ...
+        ./(Pi.^((gamma-1)/gamma)-Pi.^((gamma+1)/gamma) ./ AR.^2));
+MHats_2 = PiHat2MHat(PiHats_2);
+
+contourf(meshgrids_ranges.M, meshgrids_ranges.p, MHats_2, ...
+'levelstep', 0.02, 'linestyle', 'none')
+colorbar
+
+hold on
+% plot(M_locus, hat_ranges.p, '.k');
+hold off
+
+%%
+figure(58); clf;
+subplot(2,2,1);
+contourf(meshgrids_ranges.M, meshgrids_ranges.p, (PiHats_2-meshgrids_ranges.p), ...
+    'levelstep', 0.25, 'linestyle', 'none');
+colorbar
+
+hold on
+% plot(M_locus, hat_ranges.p, '.k');
+hold off
+
+xlabel 'M_R'
+ylabel '\Pi_R'
+
+subplot(2,2,2);
+contourf(meshgrids_ranges.M, meshgrids_ranges.p, (MHats_2-meshgrids_ranges.M), ...
+    'levelstep', 0.25, 'linestyle', 'none');
+colorbar
+
+subplot(2,2,3);
+quiver(meshgrids_ranges.M, meshgrids_ranges.p, ...
+    (MHats_2-meshgrids_ranges.M), ...
+    (PiHats_2-meshgrids_ranges.p), 25);
+colorbar
+ylim([0 2])
+xlim([0 2])
+
+%% Streamslice plot
+figure(59); clf
+streamStartX = [linspace(0,2,10), 2+0*linspace(0,2,10)];
+streamStartY = [0*linspace(0,2,10), linspace(0,2,10)];
+% sl_handle = streamline(meshgrids_ranges.M, meshgrids_ranges.p, ...
+%     (MHats_2-meshgrids_ranges.M), ...
+%     (PiHats_2-meshgrids_ranges.p), ...
+%     streamStartX, streamStartY);
+sl_handle = streamslice(meshgrids_ranges.M, meshgrids_ranges.p, ...
+    (MHats_2-meshgrids_ranges.M), ...
+    (PiHats_2-meshgrids_ranges.p));
+set(sl_handle,'color',[1 0 0]);
+ylim([0 4])
+xlim([0 2])
+
+hold on
+contour(meshgrids_ranges.M, meshgrids_ranges.p, ...
+    MHats_2-meshgrids_ranges.M, [0 0]);
+contour(meshgrids_ranges.M, meshgrids_ranges.p, ...
+    PiHats_2-meshgrids_ranges.p, [0 0], 'LineStyle', '--', 'LineColor', [0 0 0]);
+% plot(M_locus, hat_ranges.p, '.k');
+hold off
+
+xlabel 'M_R'
+ylabel '\Pi_R'
+axis equal
