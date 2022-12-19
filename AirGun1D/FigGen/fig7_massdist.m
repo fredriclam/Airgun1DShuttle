@@ -1,9 +1,7 @@
-assert(strcmpi(...
-    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
-    cd))
+% Add dependencies from repository root
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
 
-figure(6); clf;
+figure(7); clf;
 agtools.plotOperatingDistribution(solution, metadata);

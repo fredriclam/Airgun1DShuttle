@@ -10,40 +10,28 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     gama    = physConst.gamma;
     c_inf   = physConst.c_inf;
     
+    % Replace true vacuum in bubble with small number
     if p_a == 0
         p_a = 1e2*eps;
     end
     
-    %% Leak area
-    A_leak = 1e-3; % Approx 1e-3 * pi * 0.30;
-    % At t = 0, A is set to approx 50e-3 at t = 0+
-%     if t < 0
-%         A = A_leak;
-%         v_a = sqrt(gama * p_a /rho_a);
-%     end
-%     if t < 0
-%         A = 0;
-%     elseif t < 0 || A < A_leak
-%     if t < 0 || A < A_leak
-%         A = A_leak;
-%         v_a = sqrt(gama * p_a /rho_a);
-%     end
-
-
     % Convective heat transfer coefficient
     kappa = 4000;
     % Turbulent magnification factor for heat transfer
-%    M = 10;
-    M = 3.5;
+    M = 10;
     % Ambient temperature of water
     T_inf = physConst.Tinf;
     % Turbulent mechanical energy dissipation coefficient
     C = 0;
     % Langhammer-Landro dissipation coefficient
-    alpha=0.8;
+    alpha = 0.8;
+    % Water heat capacity
+    c_v_water = 4e3;
     
-    timescaleRelaxation = 1.0;%0.4;%0.12; % (unused) consider: 0.2
-    useWaterFraction = false;
+    % Default relaxation timescale for energy dissipation (s)
+    timescaleRelaxation = 1.0;
+    % Setting for using p data instead of model pressure
+    pressureHistoryOverride = false;
     
     % Allow bubble model to be specified as a character-array or as a
     % struct with field "type".
@@ -63,31 +51,18 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         if isfield(bubbleModel, 'timescaleRelaxation')
             timescaleRelaxation = bubbleModel.timescaleRelaxation;
         end
-        if isfield(bubbleModel, 'waterProperties')
-            if true
-                % Skip
-            elseif isfield(bubbleModel.waterProperties, 'fixedWaterFraction')
-                useWaterFraction = false;
-                c_p = 0.1 * 4e3 + 0.9 * gama*c_v;
-                % 10% mass fraction water
-                c_v = 0.1 * 4e3 + 0.9 * c_v;
-                gama = c_p / c_v;
-            else
-                useWaterFraction = true;
-            end
-        end
     else
         error("Unknown bubble model type. Provide 'quad', 'single', " ...
             + "'single-power', or a struct with field 'type' that has " ...
             + "is a string with one of the above values.")
     end
     
-    % Check for energy partition model
+    % Check for choice of the ad hoc energy partition model
     useEnergyPartition = false;
     enthalpyFactor = 1.0;
     if strcmpi(bubbleModelType, 'partition')
         useEnergyPartition = true;
-        enthalpyFactor = 0.33;%0.12;
+        enthalpyFactor = 0.33;
     end
 
     R    = y(1);
@@ -95,32 +70,13 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     m    = y(3);
     E    = y(4);
     
-%     % Body-inclusion radius (lift)
-%     V_body = 0.3^3 * pi/ 4; % Approximate extra volume of body included
-%     V_tot = 4/3*pi*R^3;
-%     Vbubble = V_tot - V_body;
-    
     if useEnergyPartition
+        % Read kinetic energy from bubble state vector
         K = y(5);
-    elseif isfield(bubbleModel, 'waterProperties')
-        m_water = y(5);
     end
     
-    m_water_rate = 0;
-    if useWaterFraction
-        % For example, ("psat_T", metadata_reference.discretization.physConst.Tinf-273.15)*1e5
-        p_sv = 1.6893e3;
-        condensation_coefficient = 0.04;
-        m_water_rate = M * sqrt(18.02e-3/(2*pi*(8.314))) ...
-            * condensation_coefficient * (p_sv/sqrt(T_inf)) * 4 * pi * R^2;
-    else
-        m_water_rate = 0;
-    end
-    
-    % Setting for using p data instead of model pressure
-    pressureHistoryOverride = false;
-    
-    if strcmpi('quad', bubbleModelType)    
+    if strcmpi('quad', bubbleModelType)
+        % Setting for four spherical bubbles
         % Surface area and volume factors for hemisphere
         hemisphereFactor = 0.5;
         % Quad bubble rate factor
@@ -128,6 +84,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         % Disable rarefaction factor
         rarefactionFactor = 1;
     elseif strcmpi('single', bubbleModelType)
+        % Default setting: single spherical bubble
         % Set all to default:
         hemisphereFactor = 1.0;
         rateFactor = 1;
@@ -141,14 +98,11 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         % Single bubble with power-law pressure distribution
         hemisphereFactor = 1.0;
         rateFactor = 1;
-        
-        % Power p ~ (r/R)^alpha
-        pressurePower = -7/3;
         % Surface pressure factor (0 <= this <= 1)
-        rarefactionFactor = ...
-            (pressurePower * 1 + 3) / 3;
         rarefactionFactor = 0.25;
     elseif strcmpi('data-history', bubbleModelType)
+        % Set pressure in the bubble according to a measurement
+        % Hard-coded signal fit is provided at the bottom of this file
         % Set all to default:
         hemisphereFactor = 1.0;
         rateFactor = 1;
@@ -163,33 +117,16 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         kpartition = 1.0 - epartition;
     end
     
-    c_v_water = 4e3;
-    
     % Compute bubble volume
     V = hemisphereFactor * (4/3*pi*R^3);
     Vdot = hemisphereFactor * (4*pi*R^2*Rdot);
-        
     % Compute bubble temperature
-    if useWaterFraction
-        Tb = E/(c_v*m + c_v_water*m_water);
-%         Tb = min([Tb, 20+273]);
-    else
-        Tb = E/(c_v*m);
-    end
-    
+    Tb = E/(c_v*m);
+    % Compute bubble pressure
     if pressureHistoryOverride
         [p, dpdt] = pressureHistory(t);
-    elseif useWaterFraction
-        % Heat capacity fraction weighting the total energy
-%         p = E*(gama-1)/V * c_v*m /(c_v*m + c_v_water*m_water);
-        % Ideal gas law pressure assuming incompressible droplets
-        massfrac_air = m / (m + m_water);
-        p = c_v*(gama-1)*Tb*m/V * massfrac_air;
     else
-        % Compute bubble average pressure
         p = E*(gama-1)/V;
-%         %     % Lift to vbody
-%         p = E*(gama-1)/Vbubble;
     end
     
     deltaP = C*rho_inf*abs(Rdot)*Rdot;
@@ -201,30 +138,21 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
              - p*Vdot - dQdt ...
              - hemisphereFactor*4*pi*R^2*Rdot*deltaP;
     else
-        % Water energy influx
-        dE_water_in = m_water_rate * c_v_water * T_inf;
         dE = dEin ...
              - p*Vdot - dQdt ...
-             - hemisphereFactor*4*pi*R^2*Rdot*deltaP + dE_water_in;
+             - hemisphereFactor*4*pi*R^2*Rdot*deltaP;
     end
     workrate = p*Vdot;
     
     if pressureHistoryOverride
         % dpdt already retrieved
-    elseif useWaterFraction
-        % First term in product rule:
-        dpdt = (gama-1)*(dE*V-Vdot*E)/V^2 * c_v*m /(c_v*m + c_v_water*m_water);
     else
         dpdt = (gama-1)*(dE*V-Vdot*E)/V^2;
     end
-
-    %dRdot = 1/R*((p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt - 3/2*Rdot^2);
     
-    dR = Rdot;
-    
+    dR = Rdot;    
     dRdot = 1/R*((rarefactionFactor*p-p_inf)/rho_inf + R/(rho_inf*c_inf)*dpdt ...
         - 3/2*Rdot^2 - alpha*Rdot); % correction from Langhammer and Landro (1996)
-    
     dm = rateFactor*A*rho_a*v_a;
 
     dy = [dR; dRdot; dm; dE];

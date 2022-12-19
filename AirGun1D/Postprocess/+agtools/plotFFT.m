@@ -1,19 +1,5 @@
 function [omegaVec, modelfft] = plotFFT(timeDAQ, signalData, modelSignalFn)
 
-%% Crop t vectors
-% Crop model tSample
-% idxSampling = find(tSample >= timeDAQ(end), 1, 'first');
-% if isempty(idxSampling)
-%     % Crop data tSample
-%     %     timeDAQ =
-%     idxSampling = find(tSample >= timeDAQ(end), 1, 'first');
-%     idxSampling = 2*ceil(idxSampling/2);
-%     tSampleFFT(1:)
-% %     error("tSample must sample at least the length of timeDAQ")
-% else
-%     tSampleFFT = tSample(1:idxSampling);
-% end
-
 %% Copy t vectors
 tSample = timeDAQ;
 

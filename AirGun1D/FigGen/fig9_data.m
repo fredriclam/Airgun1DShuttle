@@ -1,4 +1,4 @@
-figure(8); clf;
+figure(9); clf;
 subplot(3,1,1);
 [t, p, pData] = agtools.plotFiringChamber_Wall(fullState, 'p', HiTestData);
 xlabel('{\it{t}} (ms)', 'FontSize', 14, 'Interpreter', 'tex');

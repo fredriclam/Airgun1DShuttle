@@ -17,48 +17,9 @@ figure(4);
 tL = tiledlayout(9,1);
 nexttile(tL, 1, [3,1]);
 
-% Computation for outlet pressure (commented block)
-% Note: this is not correct until the normal shock possibility is added
-% in. This is not implemented in the main code, which does not explicitly
-% need the pressure at the bubble inlet (we can use the x = 0 total
-% enthalpy value instead for energy conservation).
-
-% MPorts = [pS.MPort];
-% APorts = [pS.APortExposed];
-% pPorts = [pS.pPort];
-% M_outlet_correct = nan(size(MPorts));
-% p_outlet_correct = nan(size(MPorts));
-% caseKeysNum = [caseKeyContext.caseKeyHistory];
-% 
-% physConst = metadata.discretization.physConst;
-% gamma = physConst.gamma;
-% for i = 1:length(MPorts)
-%     Asonic_ = physConst.crossSectionalArea / ...
-%               areaMachFunction(physConst.gamma, MPorts(i));
-%     if caseKeysNum(i) == 2 % Port choked
-%       M_outlet = 1;
-%     else
-%         M_outlet = fzero( @(M) ...
-%                         ((gamma+1)/2)^(-(gamma+1)/2/(gamma-1)) * ...
-%                         (1 + (gamma-1)/2 * M^2 )^ ...
-%                         ((gamma+1)/2/(gamma-1)) ./ M - ...
-%                         APorts(i) / Asonic_, ...
-%                         [0,1]);
-%         if caseKeysNum(i) == 1 % Subsonic
-%             assert(M_outlet < 1)
-%         end
-%     end
-%     totalPressure = pPorts(i) / ...
-%         (1 + (gamma-1)/2 * MPorts(i)^2)^(-gamma/(gamma-1));
-%     M_outlet_correct(i) = M_outlet;
-%     p_outlet_correct(i) = totalPressure * ...
-%         (1 + (gamma-1)/2 * M_outlet^2)^(-gamma/ (gamma-1));
-% end
-
 semilogx(solution.soln.x, [bS.p]/1e6, 'LineWidth', 1);
 hold on
 semilogx(solution.soln.x, [pS.pPort]/1e6, 'LineWidth', 1);
-% semilogx(solution.soln.x, [pS.p_outlet]/1e6, 'LineWidth', 1);
 extentx = [solution.soln.x(2) solution.soln.x(end)];
 semilogx(extentx, 1000*0.00689476*ones(size(extentx)), 'k--', ...
     'LineWidth', 0.5);
@@ -74,7 +35,6 @@ xlabel("{\it{t}} (s)")
 ylabel("{\it{p}} (MPa)")
 grid on
 
-% legend(["Bubble pressure", "{\it{p}} ({\it{x}} = 0)", "Bubble inlet pressure"])
 legend(["Bubble pressure", "{\it{p}} ({\it{x}} = 0)"])
 
 %% Panel (b)
@@ -82,7 +42,6 @@ nexttile(tL, 4, [2,1]);
 
 semilogx(solution.soln.x, [sS.shuttle_position], 'k', 'LineWidth', 1);
 xlim([1e-4, 1])
-% ylim([0, 7])
 
 set(gca, 'FontSize', 12, ...
     'XMinorTick', 'on', ...
@@ -127,14 +86,6 @@ drawnow
 figure(4);
 drawnow
 semilogx(tSample - dists.r1 / c_inf, p/1e3, 'k', 'LineWidth', 1);
-% loglog(tBubble, 4/3*pi*RBubble.^3, 'LineWidth', 1);
-% hold on
-% semilogx(solution.soln.x, [pS.pPort]/1e6, 'LineWidth', 1);
-% semilogx(solution.soln.x, [pS.p_outlet]/1e6, 'LineWidth', 1);
-% extentx = [solution.soln.x(2) solution.soln.x(end)];
-% semilogx(extentx, 1000*0.00689476*ones(size(extentx)), 'k--', ...
-%     'LineWidth', 0.5);
-% hold off
 xlim([1e-4, 1])
 ylim([-40, 80])
 

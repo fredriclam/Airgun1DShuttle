@@ -1,7 +1,5 @@
 %% Header
-assert(strcmpi(...
-    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
-    cd))
+% Add dependencies from root folder:
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib

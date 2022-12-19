@@ -1,5 +1,5 @@
 %% Double contour-plot
-figure(12); clf
+figure(6); clf
 [C2, h2] = agtools.plotFiringChamber_xt_nofill( ...
     fullState_noshuttle, metadata_noshuttle, caseKeyContext, ...
     [48, 186, 69]/255);

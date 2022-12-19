@@ -1,4 +1,4 @@
-figure(15); clf;
+figure(17); clf;
 
 %% Header
 assert(strcmpi(...

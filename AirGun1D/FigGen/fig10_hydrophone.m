@@ -1,4 +1,5 @@
-figure(9); clf;
+% Requires field test data
+figure(10); clf;
 
 for j = 1:2
     subplot(3,1,j);

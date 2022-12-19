@@ -1,4 +1,4 @@
-figure(14); clf;
+figure(16); clf;
 tL = tiledlayout(5,3);
 
 %% Header
@@ -78,10 +78,6 @@ clear futuresVar_mvar;
         airgunShuttlePostprocess( ...
         solution_shfeath, ...
         metadata_shfeath);
-% [fullState, ~] = ...
-%         airgunShuttlePostprocess( ...
-%         solution_ref, ...
-%         metadata_ref);
 
 %% Mass rate out
 nexttile(tL, 7, [3,3]);
@@ -103,7 +99,6 @@ legend(arrayfun(@(m) sprintf("%.1f kg", m), masses), ...
        'Interpreter', 'tex', ...
        'location', 'best')
 xlabel("{\it{t}} (ms)", "Interpreter", "tex")
-% ylabel("t (ms)", "Interpreter", "tex")
 ylim([0, 600])
 
 set(gca, 'FontSize', 15, 'TickLabelInterpreter', 'tex', ...
@@ -133,29 +128,17 @@ xlim([0, 300])
 ylim([0.00, 0.080])
 
 ch = get(gca,'Children');
-% set(ch(3), 'Color', colorCoarse, 'LineStyle', '-', 'LineWidth', 2.5);
-% set(ch(2), 'Color', colorRef,    'LineStyle', '-', 'LineWidth', 1.5);
-% set(ch(1), 'Color', colorFine,   'LineStyle', ':', 'LineWidth', 2.0);
-
-% legend(["Feather", "Light", "Medium", "Heavy"], ...
-%         'Interpreter', 'latex')
 
 xlabel('{\it{t}} (ms)', 'Interpreter', 'tex', 'FontSize', 14)
 ylabel('$\xi$ (m)', 'Interpreter', 'latex', 'FontSize', 14)
 set(gca, 'FontSize', 15, 'TickLabelInterpreter', 'tex', ...
     'XMinorTick', 'on', 'YMinorTick', 'on', "YTick", [0, 0.04, 0.08]);
-% legend(arrayfun(@(m) sprintf("%.1f kg", m), masses), ...
-%        'Interpreter', 'tex', ...
-%        'location', 'best')
    
 ch = get(gca,'Children');
 set(ch(4), 'Color', 0.85*[1 1 1], 'LineStyle', '--', 'LineWidth', 1.5);
 set(ch(3), 'Color', 0.6*[1 1 1], 'LineStyle', '-', 'LineWidth', 1.5);
 set(ch(2), 'Color', 0.3*[1 1 1], 'LineStyle', '-', 'LineWidth', 1.5);
 set(ch(1), 'Color', 0.0*[1 1 1], 'LineStyle', '-', 'LineWidth', 1.5);
-
-% % Plot inset
-% inset_axes = axes('Position',[.23 .32 .20 .36]);
 
 nexttile(tL, 1, [2,1]);
 box on
@@ -181,5 +164,3 @@ set(ch(2), 'Color', 0.3*[1 1 1], 'LineStyle', '-', 'LineWidth', 1.5);
 set(ch(1), 'Color', 0.0*[1 1 1], 'LineStyle', '-', 'LineWidth', 1.5);
 xlabel('{\it{t}} (ms)', 'Interpreter', 'tex', 'FontSize', 14)
 ylabel('$\xi$ (m)', 'Interpreter', 'latex', 'FontSize', 14)
-
-% get(gcf, 'position', [815   377   661   279])
