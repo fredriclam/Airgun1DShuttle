@@ -12,6 +12,7 @@ Field data used to generate a portion of the figures are not disclosed.
 To run the model with default parameters, navigate to the root directory of this repository. The following lines of example code will run the code with default parameters, postprocess the solution into a human-readable struct, and then plot pressure for a specific time index.
 
 ```matlab
+cd ./AirGun1D;           % Navigate to AirGun1D
 nx = 40;                 % Number of grid points per meter of the 1D domain of the firing chamber
 coupleToShuttle = true;  % Whether to control the port area by modeling the shuttle dynamics (true/false)
 options = struct();      % Struct containing optional parameters; uses only default parameters when empty
@@ -54,6 +55,10 @@ plot(x, [eulerDomainStates.p]);
 ### How do I change model parameters?
 
 * TODO
+
+## Generating paper figures
+
+The figures used in the associated publication are produced using code in [FigGen/](/AirGun1D/FigGen/), after running the model for the reference case using [runReferenceCase.m](/AirGun1D/Postprocess/runReferenceCase.m). Note that some figures have additional superimposed data, or require the field data to generate the plot.
 
 ## Simplified description of code structure
 
