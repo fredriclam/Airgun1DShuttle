@@ -17,27 +17,14 @@ classdef Chambers
             % Pistom diameter [m]
             obj.piston_diam = 11.2 * 0.0254;
             
-            use_legacy_estimates = false;
-            if use_legacy_estimates
-                % Shuttle area in the operating chamber, front [m^2]
-                obj.shuttle_area_right_front = pi/4 * ( ...
-                    obj.piston_diam^2);
-                % Shuttle area in the operating chamber, rear [m^2]
-                %   Wetted area is smaller due to shaft diameter
-                obj.shuttle_area_right_rear = pi/4 * ( ...
-                    obj.piston_diam^2 - (2.1 * 0.0254)^2); %
-                % Total travel length of the shuttle [m]
-                obj.total_travel_length = 2.6875 * 0.0254; % 3.009 * 0.0254;
-            else
-                obj.shuttle_area_right_front = 0.06155; % [m^2]
-                % Rear of shuttle: projected area of piston, minus the shaft area
-                % Estimate of shaft area:
-                shaft_area = pi/4 * (2.1 * 0.0254)^2;
-                obj.shuttle_area_right_rear = ...
-                    obj.shuttle_area_right_front - shaft_area; % [m^2]
-                % Total travel length of the shuttle [m]
-                obj.total_travel_length = 87.6e-3; % 3.009 * 0.0254;
-            end
+            obj.shuttle_area_right_front = 0.06155; % [m^2]
+            % Rear of shuttle: projected area of piston, minus the shaft area
+            % Estimate of shaft area:
+            shaft_area = pi/4 * (2.1 * 0.0254)^2;
+            obj.shuttle_area_right_rear = ...
+                obj.shuttle_area_right_front - shaft_area; % [m^2]
+            % Total travel length of the shuttle [m]
+            obj.total_travel_length = 87.6e-3; % 3.009 * 0.0254;
             
             % Compute constrained geometric parameters
             obj.totalVolume = obj.rearVolume(obj.total_travel_length);
@@ -71,6 +58,7 @@ classdef Chambers
         
         % Return distance between the piston (fixed diameter)
         % and the chamber wall as a function of shuttle displacement [m].
+        % Used for region IV calculations.
         function gapLength = gapProfile(obj, xi)
             x = xi/obj.total_travel_length;
             if x == 0
@@ -98,7 +86,7 @@ classdef Chambers
             A = pi*(rOuter^2 - rInner^2);
         end
         
-        % Return volume of gas behind the shuttle, along the
+        % Return volume of gas behind the shuttle (region III), along the
         % shuttle travel axis, as a function of the shuttle
         % displacement [m]. 
         function V = rearVolume(obj, xi)
@@ -225,30 +213,6 @@ classdef Chambers
             plot(xVec, yVec, '-', 'LineWidth', 1.5);
             xlabel 'Axis [m]'
             ylabel 'Gap area [m^2]'
-        end
-        
-        %% Legacy functions based on Mk2 patent %%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        
-        % Return distance between the piston (fixed diameter)
-        % and the chamber wall as a function of shuttle displacement [m].
-        function gapLength = gapProfileLegacy(obj, xi)
-            x = xi/obj.total_travel_length;
-            if x == 0
-                y = 0;
-            elseif x < 24/58
-                y = 5/58 * x/(24/58);
-            elseif x < 35/58
-                y = 5/58;
-            elseif x < 46/58
-                y = 5/58 - 5/58*(x-35/58)/(46/58-35/58);
-            elseif x <= 1
-                y = 0;
-            elseif x < 0 || x > 1
-                y = 0;
-                warning('Queried geometry outside of bounds')
-            end
-            gapLength = y * obj.total_travel_length;
         end
     end
 end

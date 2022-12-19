@@ -19,6 +19,11 @@ iterativeSolveTol = 1e-6;
 iterateToTolMaxIterations = 1;
 caseReiterationMax = 100;
 
+if numel(q) > length(q)
+    warning("fullState called for matrix of state variables. Function " + ...
+            "is only intended for vector of state variables at a single t. ")
+end
+
 %% Compute primitive variables at right of PDE domain
 q_R = obj.schm.e_R'*q;
 p_R = obj.schm.p(q_R);
