@@ -12,7 +12,13 @@ Field data used to generate a portion of the figures are not disclosed.
 To run the model with default parameters, navigate to the root directory of this repository. The following lines of example code will run the code with default parameters, postprocess the solution into a human-readable struct, and then plot pressure for a specific time index.
 
 ```matlab
-cd ./AirGun1D;           % Navigate to AirGun1D
+% Navigate to AirGun1D from repository root
+cwd = pwd();
+inds = strfind(cwd, filesep());
+if cwd(inds(end)+1:end) ~= "AirGun1D"
+    cd ./AirGun1D;
+end
+
 nx = 40;                 % Number of grid points per meter of the 1D domain of the firing chamber
 coupleToShuttle = true;  % Whether to control the port area by modeling the shuttle dynamics (true/false)
 options = struct();      % Struct containing optional parameters; uses only default parameters when empty
