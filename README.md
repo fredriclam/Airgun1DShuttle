@@ -98,8 +98,8 @@ options (struct)
 Other parameters can typically be overriden using `options`. The fields `bubbleModel` and `extraOptions` are themselves structs inside `options`. Note the units of each quantity. The initial bubble radius is passed in `extraOptions`.
 
 Other fixed model parameters are set in the following locations:
-* [airgunShuttleDeploy.m](/airgunShuttleDeploy.m) sets default parameters for the run, and unpacks the provided `options`.
-* [Chambers.m](/Chambers.m) contains fixed geometry values of the operating and middle chambers (regions II to IV).
+* [airgunShuttleDeploy.m](/AirGun1D/airgunShuttleDeploy.m) sets default parameters for the run, and unpacks the provided `options`.
+* [Chambers.m](/AirGun1D/Chambers.m) contains fixed geometry values of the operating and middle chambers (regions II to IV).
 * [configAirgun.m](/AirGun1D/SBPSAT/configAirgun.m) contains fixed geometry values for the shuttle and the source.
 
 ## Generating paper figures
@@ -110,3 +110,8 @@ The figures used in the associated publication are produced using code in [FigGe
 
 The wrapper [`airgunShuttleDeploy`](/AirGun1D/airgunShuttleDeploy.m
 ) calls [`runEulerCodeShuttleDual`](/AirGun1D/SBPSAT/runEulerCodeShuttleDual.m), which contains the code for the case where the port area is controlled by shuttle dynamics, and the case where the port area is set to the maximum port area at `t = 0`. The function `runEulerCodeShuttleDual` initializes the model and feeds the ODE right-hand-side (coming from the finite-difference discretization of the PDEs combined with the shuttle and bubble ODEs) to the ODE solver (`ode45` with maximum timestep given by the CFL condition). The ODE right-hand-side is defined in the class definition of [`DiscrAirgunShuttleMulti`](AirGun1D/SBPSAT/@DiscrAirgunShuttleMulti/DiscrAirgunShuttleMulti.m) . Useful functions of the state variables, such as the boundary flow state, are computed in [`fullState`](AirGun1D/SBPSAT/@DiscrAirgunShuttleMulti/fullState.m).
+
+## License
+* sbplib is under an MIT [license](/sbplib/LICENSE.txt).
+* AirGun1D by [leighton-watson](https://github.com/leighton-watson/AirGun1D) is under an MIT [license](AirGun1D/license_AirGun1D.txt).
+* This work, derived from AirGun1D, is under an MIT [license](AirGun1D/license_Airgun1DShuttle.txt).
