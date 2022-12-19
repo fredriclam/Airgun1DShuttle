@@ -74,18 +74,30 @@ function [solution, metadata] = ...
             metadata.extraOptions);
     q0 = discretization.q0;
     bubble0 = discretization.bubble0;
+%     % Lifting to V + V_body
+%     V_body = 0.3^3 * pi/ 4; % Approximate extra volume of body included
+%     V_new = 4/3*pi*bubble0(1).^3 + V_body;
+%     bubble0(1) = (V_new / (4/3*pi))^(1/3);
+    
     % Injection for partitioned-energy bubble model
     if isstr(bubbleModel)
         if strcmpi('partition', bubbleModel)
+            bubble0 = [bubble0; 0];
+        elseif strcmpi('single-power', bubbleModel)
+            bubble0(3:4) = bubble0(3:4) / 0.25;
             bubble0 = [bubble0; 0];
         end
     elseif isstruct(bubbleModel)
         if strcmpi('partition', bubbleModel.type)
             bubble0 = [bubble0; 0];
+        elseif strcmpi('single-power', bubbleModel.type)
+            bubble0(3:4) = bubble0(3:4) / 0.25;
+            bubble0 = [bubble0; 0];
         elseif isfield(bubbleModel, 'waterProperties')
             bubble0 = [bubble0; 0];
         end 
     else
+%         bubble0 = [bubble0; 0];
         error('Unknown bubble model')
     end
     shuttle0 = discretization.shuttle0;
@@ -227,7 +239,7 @@ function [solution, metadata] = ...
     % Reduced memory and computational cost.
     disp('Starting ODE solve for uncoupled bubble.');
     
-    solnBubbleContinuation = ode23(...
+    solnBubbleContinuation = ode45(...
         @(t,y) bubbleRHS(t, y, 0, 0, 0, 0, 0, discretization.physConst, ...
         paramAirgun.bubbleModel), ...
         [tspan(2), tBubbleFinal], bubble(:,end),options);

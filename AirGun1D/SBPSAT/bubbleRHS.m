@@ -10,6 +10,10 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     gama    = physConst.gamma;
     c_inf   = physConst.c_inf;
     
+    if p_a == 0
+        p_a = 1e2*eps;
+    end
+    
     %% Leak area
     A_leak = 1e-3; % Approx 1e-3 * pi * 0.30;
     % At t = 0, A is set to approx 50e-3 at t = 0+
@@ -20,16 +24,17 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
 %     if t < 0
 %         A = 0;
 %     elseif t < 0 || A < A_leak
-    if t < 0 || A < A_leak
-        A = A_leak;
-        v_a = sqrt(gama * p_a /rho_a);
-    end
+%     if t < 0 || A < A_leak
+%         A = A_leak;
+%         v_a = sqrt(gama * p_a /rho_a);
+%     end
 
 
     % Convective heat transfer coefficient
     kappa = 4000;
     % Turbulent magnification factor for heat transfer
-    M = 10;
+%    M = 10;
+    M = 3.5;
     % Ambient temperature of water
     T_inf = physConst.Tinf;
     % Turbulent mechanical energy dissipation coefficient
@@ -37,7 +42,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     % Langhammer-Landro dissipation coefficient
     alpha=0.8;
     
-    timescaleRelaxation = 0.005; % (unused)
+    timescaleRelaxation = 1.0;%0.4;%0.12; % (unused) consider: 0.2
     useWaterFraction = false;
     
     % Allow bubble model to be specified as a character-array or as a
@@ -79,14 +84,22 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     
     % Check for energy partition model
     useEnergyPartition = false;
+    enthalpyFactor = 1.0;
     if strcmpi(bubbleModelType, 'partition')
         useEnergyPartition = true;
+        enthalpyFactor = 0.33;%0.12;
     end
 
     R    = y(1);
     Rdot = y(2);
     m    = y(3);
     E    = y(4);
+    
+%     % Body-inclusion radius (lift)
+%     V_body = 0.3^3 * pi/ 4; % Approximate extra volume of body included
+%     V_tot = 4/3*pi*R^3;
+%     Vbubble = V_tot - V_body;
+    
     if useEnergyPartition
         K = y(5);
     elseif isfield(bubbleModel, 'waterProperties')
@@ -134,6 +147,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
         % Surface pressure factor (0 <= this <= 1)
         rarefactionFactor = ...
             (pressurePower * 1 + 3) / 3;
+        rarefactionFactor = 0.25;
     elseif strcmpi('data-history', bubbleModelType)
         % Set all to default:
         hemisphereFactor = 1.0;
@@ -145,12 +159,8 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     end
     
     if useEnergyPartition
-        kpartition = 1;%gama/2;
-        epartition = 0;%1/(gama-1);
-        partsize = (kpartition + epartition);
-        % Compute ratios for sharing incoming enthalpy
-        kpartition = kpartition / partsize;
-        epartition = epartition / partsize;
+        epartition = enthalpyFactor;
+        kpartition = 1.0 - epartition;
     end
     
     c_v_water = 4e3;
@@ -158,6 +168,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     % Compute bubble volume
     V = hemisphereFactor * (4/3*pi*R^3);
     Vdot = hemisphereFactor * (4*pi*R^2*Rdot);
+        
     % Compute bubble temperature
     if useWaterFraction
         Tb = E/(c_v*m + c_v_water*m_water);
@@ -177,6 +188,8 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     else
         % Compute bubble average pressure
         p = E*(gama-1)/V;
+%         %     % Lift to vbody
+%         p = E*(gama-1)/Vbubble;
     end
     
     deltaP = C*rho_inf*abs(Rdot)*Rdot;
