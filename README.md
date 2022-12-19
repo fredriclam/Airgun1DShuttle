@@ -15,9 +15,14 @@ To run the model with default parameters, navigate to the root directory of this
 % Navigate to AirGun1D from repository root
 cwd = pwd();
 inds = strfind(cwd, filesep());
-if cwd(inds(end)+1:end) ~= "AirGun1D"
+if ~strcmpi("AirGun1D", cwd(inds(end)+1:end))
     cd ./AirGun1D;
 end
+
+% Add dependencies from folder /AirGun1D/
+addpath ./FlowRelations
+addpath ./SBPSAT
+addpath ../sbplib
 
 nx = 40;                 % Number of grid points per meter of the 1D domain of the firing chamber
 coupleToShuttle = true;  % Whether to control the port area by modeling the shuttle dynamics (true/false)
@@ -60,7 +65,42 @@ plot(x, [eulerDomainStates.p]);
 
 ### How do I change model parameters?
 
-* TODO
+Model parameters can be changed by providing `options` as the optional parameter to `airgunShuttleDeploy`. `options` is a struct containing any of the following fields (and their associated values):
+```
+options (struct)
+├── leakTime (s)
+├── tspan (as array [tstart, tend])
+├── airgunDepth (m)
+├── airgunPressure (psi)
+├── airgunVolume (cubic inches)
+├── airgunInnerDiameter (inches)
+├── bubbleModel (struct)
+│   ├── type ['single' | 'quad' | 'partition' | 'data-history']
+│   ├── M (magnification factor)
+│   └── alpha (damping factor)
+└── extraOptions (struct)
+    ├── TInitial (K)
+    ├── R (initial bubble radius, m)
+    ├── Rdot (initial bubble interface velocity, m/s)
+    ├── pb (initial bubble pressure, Pa)
+    ├── shuttleAssemblyMass (kg)
+    ├── dampingConstant
+    ├── OpRearOrificeArea (m^2)
+    ├── gasConstant or Q (specific gas constant; either keyword works)
+    ├── c_v (specific heat capacity of bubble gas)
+    ├── gamma (heat capacity ratio)
+    └── IC (struct; must contain all 4 of the following functions)
+        ├── rho0 (function x -> initial density)
+        ├── rv0 (function x -> initial momentum density)
+        ├── e0 (function x -> initial total energy density)
+        └── p0 (function x -> initial pressure)
+```
+Other parameters can typically be overriden using `options`. The fields `bubbleModel` and `extraOptions` are themselves structs inside `options`. Note the units of each quantity. The initial bubble radius is passed in `extraOptions`.
+
+Other fixed model parameters are set in the following locations:
+* [airgunShuttleDeploy.m](/airgunShuttleDeploy.m) sets default parameters for the run, and unpacks the provided `options`.
+* [Chambers.m](/Chambers.m) contains fixed geometry values of the operating and middle chambers (regions II to IV).
+* [configAirgun.m](/AirGun1D/SBPSAT/configAirgun.m) contains fixed geometry values for the shuttle and the source.
 
 ## Generating paper figures
 
