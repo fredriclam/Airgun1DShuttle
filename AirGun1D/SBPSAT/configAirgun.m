@@ -18,7 +18,7 @@ end
 
 switch str
     case 'Bolt1500LL'
-        % 'realistic' initial conditions that will be used in paper.        
+        % 'realistic' initial conditions that will be used in paper [LW2019].       
         % bubble volume is set equal to the airgun volume 
         % temperature and pressure in the bubble is the same as the ambient properties.
         % The airgun is set to have constant values.
@@ -103,12 +103,6 @@ switch str
         physConst.p0a = p0a;
         % Airgun length [m]
         physConst.L = airgunLength;
-
-%         cross_sectional_area = 24; % [in^2] cross sectional area is calculated by assuming 1m long (39.3701) for 600in3 airgun.
-% %         cross_sectional_area = airgunPortArea;
-%         airgunLengthImperial = physConst.L/0.0254; % length in inches
-%         V_imperial = airgunLengthImperial * cross_sectional_area;
-%         V = V_imperial * 1.63871e-5; % air gun volume [m^3]
 
         % Cross-sectional area [in^2]
         crossSectionalAreaImperial = airgunCrossSectionalArea; % 12.5 in^2 in [Watson 2019]
@@ -291,5 +285,5 @@ switch str
         
     otherwise
         error("in configAirgun: unknown parameters key");
-    end
+end
 end

@@ -1,5 +1,7 @@
+% Deprecated
 % Working script that contains various postprocess routines.
 % To be split into multiple files.
+% See FigGen/ instead
 
 %% Header
 % Add required dependencies from AirGun1D root.

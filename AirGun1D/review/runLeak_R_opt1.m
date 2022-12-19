@@ -1,4 +1,5 @@
-% Run the leak case
+% Run the leak case to test hypothesis of seed bubble influencing the
+% acoustic peak pressure overprediction.
 
 nx = 40;
 p_ksi = 6.895e+6;

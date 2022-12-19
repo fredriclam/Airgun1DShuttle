@@ -1,3 +1,10 @@
+% Postprocessing wrapper
+% Compute solution, metadata from airgunShuttleDeploy.
+% gridFullStates is optional (full state will be computed if not provided.)
+% If gridFullStates is passed, this function is used to plot some useful
+% states and provide the context object for the flow state at the boundary
+% between the firing chamber and the port.
+
 function [gridFullStates, caseKeyContext] = airgunShuttlePostprocess( ...
     solution, metadata, gridFullStates)
 if nargin == 3
