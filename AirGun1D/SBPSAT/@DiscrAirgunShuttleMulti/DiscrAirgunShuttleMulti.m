@@ -261,10 +261,11 @@ classdef DiscrAirgunShuttleMulti < DiscrAirgun
                         bubbleModel ...
                     );
                 end
-                % Freeze bubble when port is closed
+                % Freeze bubble when port is closed exactly, or if flow is
+                % sufficiently small at the boundary grid point
                 if ~REVERT_MODEL
                     if agState.portStates.APortExposed == 0 ...
-                            || abs(agState.eulerDomainStates.M_R) < 1e-6 % TODO: remove M_R condition
+                            || abs(agState.eulerDomainStates.M_R) < 1e-6
                         if obj.bubbleFrozen
                             % Removed for leak problem
 %                             dBubble = zeros(size(dBubble));

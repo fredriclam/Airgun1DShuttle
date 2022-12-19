@@ -1,6 +1,4 @@
-%% Deprecated
-%% TODO: document
-%% TODO: visualize operating chamber geometry
+%% Deprecated (see Chambers)
 
 classdef OperatingChamber
     properties

@@ -1,27 +1,15 @@
-% Main script for orchestrating code runs of airgun model with shuttle.
+% Legacy main script for orchestrating code runs of airgun model with
+% shuttle. It is recommended to use the example code in README.md, or to
+% use runReferenceCase to access the numerical solution of the reference
+% model.
 % 
 % Uses SBPlib to set up the 1D Euler domain for the interior of the airgun
 % firing chamber. Adds the model for the port area between the airgun
 % domain and the bubble. Adapted from WIP test_launch_script_v1.m script.
 
-clear; clc;
-
-%% TODO: Plot closed chamber evolution
-% TODO: Implement chambers passing data
-% TODO: Implement passing exceptions
-% TODO: Implement use of post-processing in Chambers
-% TODO: Post check of boundary conditions in the real solution time points
-% monitor_postprocessing(monitorStates)
-
-return
-
 %% Mass Deploy
 
-% Disable assertion on release!
 % File path must be correct (check the following addpath is successful)
-assert(strcmpi(...
-    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
-    cd))
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
@@ -48,9 +36,6 @@ end
 %% Mass Deploy II
 % For different effective port areas
 
-assert(strcmpi(...
-    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
-    cd))
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib
@@ -620,7 +605,6 @@ hold off
 
 %% Figure: Pressure contours in x-t plot @ near time
 new.t = 1e3*[fullStateBest.t];
-% TODO: check metadata comes from the same source
 new.x = linspace(metadata.discretization.schm.u(1), ...
     metadata.discretization.schm.u(end), size(new.pAll,1));
 

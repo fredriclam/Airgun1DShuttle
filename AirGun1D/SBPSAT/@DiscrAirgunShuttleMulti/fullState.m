@@ -122,7 +122,6 @@ function [qPort, exitFlag] = processSubsonicCase(qIn)
     essentialConstraint = @(q) machFn(q) - MPortFn(q);
 
     % Solve for viable q
-    % TODO: prove uniqueness?
     [qPort, exitFlag] = ...
         obj.enforceScalarConstraint(essentialConstraint, qIn);
 end
