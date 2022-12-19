@@ -100,21 +100,4 @@ if has_shuttle_position
     ylim([0, ylimCurrent(2)])
 end
 
-% legendLabels = {'Closed', ...
-%     'Subsonic', ...
-%     'Port choked', ...
-%     'Chamber choked', ...
-%     'Chamber choked*', ...
-%     'Relaxation'};
-% legend(legendLabels, 'Interpreter', 'latex', 'location', 'eastoutside', ...
-%     'FontSize', 10)
-
-% Resize axes
-% subplot(1,3,3);
-% set(gca, 'position', [0.68, 0.13, 0.15, 0.68])
-% subplot(1,3,1);
-% ylim([0, ylimCurrent(2)])
-% set(gca, 'position', [0.07, 0.13, 0.16, 0.68])
-% subplot(1,3,2);
-% set(gca, 'position', [0.25, 0.13, 0.40, 0.68])
 set(gcf, 'position', [200 399 850 483])

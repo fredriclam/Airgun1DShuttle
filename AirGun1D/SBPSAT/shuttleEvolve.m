@@ -143,8 +143,6 @@ end
 % Replace with acoustic impedance if available
 if nargin >= 5
     dampingConstant = Z_L * physConst.shuttle_area_left;
-    % Slow piston rarefaction limit factor on p_I?
-%     pFactor = 0.279;
 end
 
 linearDamping = - dampingConstant * z(2);

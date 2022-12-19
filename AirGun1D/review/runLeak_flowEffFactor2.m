@@ -1,4 +1,4 @@
-% Run the leak case
+% Run the leak case (hypothesis for initial peak pressure overprediction)
 
 nx = 40;
 p_ksi = 6.895e+6;

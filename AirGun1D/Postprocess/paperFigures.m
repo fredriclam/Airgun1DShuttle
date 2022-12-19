@@ -2,9 +2,10 @@
 % To be split into multiple files.
 
 %% Header
-assert(strcmpi(...
-    'C:\Users\Fredric\Documents\Airgun\airgun_code_li\AirGun1D', ...
-    cd))
+% Add required dependencies from AirGun1D root.
+% The following assumes the user is in the ./AirGun1D folder (otherwise,
+% replace the following lines with the relative path to the respective
+% folders.
 addpath .\FlowRelations
 addpath .\SBPSAT
 addpath ..\sbplib

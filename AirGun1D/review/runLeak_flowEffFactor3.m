@@ -1,4 +1,4 @@
-% Run the leak case
+% Run the leak case (hypothesis for initial peak pressure overprediction)
 
 nx = 40;
 p_ksi = 6.895e+6;
@@ -314,10 +314,6 @@ plot(tsp_rr0, p_out_rr0/1e5*r1_96);
 plot(tsp_rr1, p_out_rr1/1e5*r1_96);
 plot(tsp_rr2, p_out_rr2/1e5*r1_96);
 plot(tsp_rr3, p_out_rr3/1e5*r1_96);
-% plot(tsp_rr0, p_out_rr0/1e5*r1_96, 'r');
-% plot(tsp_rr1, p_out_rr1/1e5*r1_96, 'g');
-% plot(tsp_rr2, p_out_rr2/1e5*r1_96, 'b');
-% plot(tsp_rr3, p_out_rr3/1e5*r1_96, 'm');
 
 % Plot DAQ
 for i = 1:4
@@ -335,5 +331,4 @@ end
 
 xlim([0,0.1])
 legend(["\eta=1.0", "\eta=0.75", "\eta=0.5", "\eta=0.25"])
-% title("Flow efficiency \eta > 0.5")
 drawnow
