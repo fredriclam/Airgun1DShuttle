@@ -160,6 +160,7 @@ function [dy, dQdt, workrate, dEin] = bubbleRHS( ...
     if useEnergyPartition
         dy = [dy; dK];
     elseif isfield(bubbleModel, 'waterProperties')
+        m_water_rate = 0;
         dy = [dy; m_water_rate];
     end
 end

@@ -105,7 +105,7 @@ switch str
         physConst.L = airgunLength;
 
         % Cross-sectional area [in^2]
-        crossSectionalAreaImperial = airgunCrossSectionalArea; % 12.5 in^2 in [Watson 2019]
+        crossSectionalAreaImperial = airgunCrossSectionalArea;
         % Compute volume
         airgunLengthImperial = airgunLength/0.0254; % [in]
         V_imperial = crossSectionalAreaImperial * airgunLengthImperial; % [cui]
@@ -120,17 +120,11 @@ switch str
         % Compute ambient pressure at depth [Pa]
         physConst.p_inf = physConst.pa + physConst.rho_inf*g*depth;
         
-        %% (Air calorically perfect gas) constants
+        %% (Air as calorically perfect gas) constants
         physConst.c_v = 718;    % heat capacity of air at constant volume [J/kgK]
         physConst.c_inf = 1482; % speed of sound in water [m/s]
         physConst.Q = 287.06;   % specific gas constant for dry air [J/kgK]
         physConst.gamma = 1.4;  % ratio of heat capacities for dry air
-        
-        %% Fixed open-time model: unused
-        % Time when air gun stops firing [s]
-        % Warning: suggested to be 0.010 s in paper, but specified as 0.04
-        % in airgun1d/HEAD
-        % physConst.AirgunCutoffTime = 0.04;
         
         %% Compute airgun initial conditions
         
@@ -139,6 +133,21 @@ switch str
             disp('Using extra option -- TInitial -- for bubble & chamber');
         else
             T = physConst.Tinf;
+        end
+        if isfield(extraOptions, 'gasConstant')
+            physConst.Q = extraOptions.gasConstant;
+            disp('Using extra option -- gasConstant Q');
+        elseif isfield(extraOptions, 'Q')
+            physConst.Q = extraOptions.Q;
+            disp('Using extra option -- gasConstant Q');
+        end
+        if isfield(extraOptions, 'gamma')
+            physConst.gamma = extraOptions.gamma;
+            disp('Using extra option -- gamma');
+        end
+        if isfield(extraOptions, 'c_v')
+            physConst.c_v = extraOptions.c_v;
+            disp('Using extra option -- c_v');
         end
         
         p = physConst.p0a;
@@ -151,6 +160,19 @@ switch str
         icAirgun.rv0  = @(x)0*x;
         icAirgun.e0   = @(x)0*x + e;
         icAirgun.p0   = @(x)0*x + p;
+        
+        if isfield(extraOptions, 'IC')
+            try
+                IC = extraOptions.IC;
+                icAirgun.rho0 = IC.rho0;
+                icAirgun.rv0  = IC.rv0;
+                icAirgun.e0   = IC.e0;
+                icAirgun.p0   = IC.p0;
+            catch
+                error("Could not unpack initial condition (IC) " ...
+                    + "functions rho0, rv0, e0, and p0.")
+            end
+        end
         
         %% Set bubble initial conditions and gas air parameters
         p = physConst.p_inf;
@@ -200,71 +222,45 @@ switch str
         
         % Convert port area from [in^2] to [m^2]
         physConst.APortTotal = airgunPortArea*0.00064516;
-        % MkI estimate: ~0.0329 m^2
-        disp('configAirgun:Overriding supplied port area with measurement.')
-        % Measurement:
+        % From measurement:
         physConst.APortTotal = 90 * (0.0254)^2; % 0.0581 m^2
-        
-        
-        % Ludvig uses: 0.0464 [m^2] ~ 72 in^2
-        
         % Set fixed operating chamber length [m]
-        % Estimate:
-%         physConst.operatingChamberLength = 3.009 *0.0254;
-        % Measurement:
         physConst.operatingChamberLength = 87.6e-3;
-        
         
         % Set firing chamber and operating chamber profiles A(x)
         physConst.airgunFiringChamberProfile = ...
             airgunFiringChamberProfile;
         physConst.airgunOperatingChamberProfile = ...
             airgunOperatingChamberProfile;
-        
-        %% Cupped piston area
-        % Estimate:
-%         physConst.shuttle_area_left = pi/4 * (11.2 * 0.0254)^2; % [m^2]
-        % Actual:
+        % Set cupped piston area
         physConst.shuttle_area_left = 0.04735; % [m^2]
-        
-        %% Front of shuttle (flange): projected area
-        % Estimate:
-%         physConst.shuttle_area_right = pi/4 * ( ...
-%             (11.1 * 0.0254)^2); % [m^2]
-        % Actual:
+        % Set front-of-shuttle (flange) projected area
         physConst.shuttle_area_right = 0.06155; % [m^2]
-        
         % Rear of shuttle: projected area of piston, minus the shaft area
         % Estimate of shaft area:
         shaft_area = pi/4 * (2.1 * 0.0254)^2;
         physConst.shuttle_area_right_rear = ...
             physConst.shuttle_area_right - shaft_area; % [m^2]
-        
-        % Lead-in length where shuttle can move without exposing the air
+        % Lead-in length (acceleration distance) where shuttle can move
+        % without exposing the air
         physConst.portLead = 0.0; % [m]
         
-        % (Unused) thickness of the flane in the operating chamber
+        % (Unused) thickness of the flange in the operating chamber
         physConst.flangeDepth = 3 * 0.0254; % [m]
         % Approximate the flange ID to be equal to the chamber
-        
         
         physConst.plugVolumeFn = @(xi) error("Deprecated function"); ...
             % physConst.crossSectionalArea * (xi + physConst.flangeDepth);
 
         % Set shuttle penalty parameter
         %   (~1e11 makes sense based on linear elasticity, although
-        %    this should not activate because of the gas region III.)
+        %    this should typically not activate because of the gas region
+        %    cushioning the closing shuttle III.)
         physConst.shuttleBdryPenaltyStrength = shuttleBdryPenaltyStrength;
         
-        physConst.airgunPortLength = airgunPortLength;
-        % MkI estimate: 2.3750 in
-        disp('configAirgun:Overriding supplied port length with measurement.')
-        % Measurement:
         physConst.airgunPortLength = 84.6e-3/0.0254; %[in]
-        
         physConst.midChamberLength = 3.112 * 0.0254;
         physConst.midChamberArea = physConst.shuttle_area_left;
-%         physConst.OpRearOrificeArea =  1e-5;
         physConst.OpRearOrificeArea =  1.37e-6; % (0.052"D)
         
         if isfield(extraOptions, 'dampingConstant')

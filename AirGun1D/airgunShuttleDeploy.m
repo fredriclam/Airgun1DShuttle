@@ -14,10 +14,6 @@ else
     useOverrideOptions = false;
 end
 
-addpath .\FlowRelations
-addpath .\SBPSAT
-addpath ..\sbplib
-
 %% Simulation controls
 % Simulation window [s]
 % Suggested values:
@@ -50,30 +46,16 @@ airgunInnerDiameter = 10.0;                       % Inner diameter of airgun [in
 % Not used in current version.
 airgunFiringChamberProfile = @(x) error(...
     'Not implemented. Placeholder for firing chamber profile function.');
-
-%% Set mid chamber operation mode
+% Set mid chamber operation mode
 % midChamberMode = 'limit-vented';
 midChamberMode = 'limit-closed';
+% Set linear elastic penalty term for solid-solid collision shuttle [N/m]
+shuttleBdryPenaltyStrength = 1e11; 
+% Deprecated parameters (constrained by design measurement)
+airgunPortLength = NaN;
 
-%% Set port parameters
-airgunPortAreaRatio = 110/180;0.80; %110/180;                        % Portion of lateral area covered by port [-]
-airgunOuterDiameter = 11.2;                       % Outer diameter of firing chamber [in]
-airgunPortLength = 2.375;                           % Length of port [in]
-% Shuttle parameters
-shuttleBdryPenaltyStrength = 1e11;                % Linear elastic penalty term for shuttle [N/m]
-
-%% Set operating chamber specifications
-% Deprecated -- shouldn't be used. Specs taken from discretization >
-% Chambers object instead
-% airCushionLength = 0.542*0.0254;                  % Length of closed air cushioning effect [m]
-% accelerationLength = (2.6875-0.542)*0.0254; % (3.009-0.542)*0.0254;        % Length over which shuttle accelerates freely [m]
-
-% Compression factor of air cushion as function of shuttle position
-% airgunOperatingChamberProfile = @(xi) (xi - accelerationLength < 0) * 1 ...
-%     + (xi - accelerationLength > 0) * ...
-%     (airCushionLength / (airCushionLength - (xi - accelerationLength)));
+%% Set legacy operating chamber specs
 airgunOperatingChamberProfile = @() error('Legacy argument used');
-
 %% Extra options struct for passing through to airgunConfig
 extraOptions = struct();
 
@@ -89,12 +71,10 @@ if useOverrideOptions
 end
 
 %% Compute dependent parameters
-airgunCrossSecArea = pi*airgunInnerDiameter^2/4;  % Firing chamber cross-sectional area [in^2]
-airgunLength = airgunVolume / ...
-    airgunCrossSecArea * 0.0254;                  % Firing chamber length [m]
-airgunPortArea = airgunPortAreaRatio * ...
-    pi * airgunOuterDiameter * airgunPortLength;  % Effective port area [in^2]
-airgunPortArea = 90; % Measured port area override [in^2]
+airgunCrossSecArea = pi*airgunInnerDiameter^2/4;            % Firing chamber cross-sectional area [in^2]
+airgunLength = airgunVolume / airgunCrossSecArea * 0.0254;  % Firing chamber length [m]
+% Set port area from measurement [in^2]
+airgunPortArea = 90;
 
 %% Housekeeping: Data packing
 paramAirgun = struct(...
@@ -110,7 +90,7 @@ paramAirgun = struct(...
     'midChamberMode', midChamberMode, ...
     'airgunPortLength', airgunPortLength, ...
     'bubbleModel', bubbleModel);
-% Initialize metadata struct for documenting results
+% Initialize metadata struct for documenting numerical solution
 metadata = struct(...
     'paramAirgun', paramAirgun, ...
     'nx', nx, ...
@@ -118,7 +98,7 @@ metadata = struct(...
     'usingShuttleModel', coupleToShuttle, ...
     'extraOptions', extraOptions);
 
-%% Run solve for both models    
+%% Solve PDE
 [solution, metadata] = ...
     runEulerCodeShuttleDual(nx, tspan, ...
                             paramAirgun, coupleToShuttle, metadata);
