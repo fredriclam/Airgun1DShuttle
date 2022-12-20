@@ -97,6 +97,16 @@ options (struct)
 ```
 Other parameters can typically be overriden using `options`. The fields `bubbleModel` and `extraOptions` are themselves structs inside `options`. Note the units of each quantity. The initial bubble radius is passed in `extraOptions`.
 
+Example setting source depth and initial bubble radius:
+```matlab
+options = struct( ...
+    "airgunDepth", 20, ...
+    "extraOptions", struct( ...
+        "R", 1.0 ...
+    ) ...
+);
+```
+
 Other fixed model parameters are set in the following locations:
 * [airgunShuttleDeploy.m](/AirGun1D/airgunShuttleDeploy.m) sets default parameters for the run, and unpacks the provided `options`.
 * [Chambers.m](/AirGun1D/Chambers.m) contains fixed geometry values of the operating and middle chambers (regions II to IV).
