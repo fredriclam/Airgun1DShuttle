@@ -296,6 +296,7 @@ else
         * obj.physConst.APortTotal;
     % Clamp to [0, APortTotal]
     APortExposed = min([max([0, APortExposed]), obj.physConst.APortTotal]);
+    APortExposed = 0.01;
     % Apply flow reduction factor (default: no change; 1.0)
     F = 1.0;
     if isfield(obj.bubbleModel, 'flowreductionfactor')
