@@ -133,6 +133,10 @@ function q = computeDensityConstrainedState(rho, qGrid)
          p/(gamma-1) + 0.5*rho*u^2];
 end
 
+% For suddenly opened shuttles, preserve positivity
+q_R(1) = max([q_R(1), 1e-7]);
+q_R(3) = max([q_R(3), 1e-7 + 0.5*q_R(2)^2/q_R(1)]);
+
 % Constrain qhat to the feasible space
 qConstrained = @(rho) computeDensityConstrainedState(rho, q_R);
 

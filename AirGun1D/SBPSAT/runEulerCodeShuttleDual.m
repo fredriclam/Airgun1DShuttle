@@ -193,15 +193,15 @@ function [solution, metadata] = ...
     % Set ODE solver options
     options = odeset('RelTol',REL_TOL);
     figure(99);
+    % Compute max wave speed
+    gamma = discretization.physConst.gamma;
+    h = discretization.h;
+    w_max0 = 2 * max( ...
+        sqrt(gamma * (gamma - 1) * ( ...
+        q0(3:3:end) ./ q0(1:3:end) ...
+        - 0.5*q0(2:3:end).^2 ./ q0(1:3:end).^2)));
     % Split ode solve
     if tspan(1) < 0
-        % Compute max wave speed
-        gamma = discretization.physConst.gamma;
-        h = discretization.h;
-        w_max0 = 2 * max( ...
-            sqrt(gamma * (gamma - 1) * ( ...
-            q0(3:3:end) ./ q0(1:3:end) ...
-            - 0.5*q0(2:3:end).^2 ./ q0(1:3:end).^2)));
         % ODE splitting to prevent stiffness in dy
         tspan1 = [tspan(1), 0];
         tspan2 = [0, tspan(2)];
@@ -209,6 +209,7 @@ function [solution, metadata] = ...
         options = odeset('RelTol',REL_TOL,'MaxStep',h/w_max0);
         sol_ode = odextend(sol_ode, @odefun, tspan2(2), sol_ode.y(:,end), options);
     else
+        options = odeset('RelTol',REL_TOL,'MaxStep',h/w_max0);
         sol_ode = ode45(@odefun, tspan, y0,options);
     end
 
