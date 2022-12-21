@@ -1,4 +1,5 @@
-# Airgun1D with shuttle integration
+# Airgun1D with shuttle integration [![DOI](https://zenodo.org/badge/327449665.svg)](https://zenodo.org/badge/latestdoi/327449665)
+
 
 Code for source model used in *Influence of port opening dynamics on the acoustic signature of pneumatic marine seismic sources* (2023). This model invokes the quasi-one-dimensional Euler equations to model the gas in the pneumatic seismic source (airgun) coupled to a bubble and a shuttle constrained by the geometry of the airgun.
 
